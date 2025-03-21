@@ -41,8 +41,22 @@ export const auth = {
   logout() {
     if (typeof window === 'undefined') return;
     
+    // Clear all authentication data
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Clear any other application data
+    localStorage.clear(); // This will clear ALL localStorage data
+    sessionStorage.clear(); // Clear any session storage data too
+    
+    // Clear any cookies (except those marked httpOnly)
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    
+    // Redirect to login page
     window.location.href = '/login';
   }
 }; 

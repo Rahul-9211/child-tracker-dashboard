@@ -1,6 +1,5 @@
 "use client"
 
-import { ThemeToggle } from "@/components/theme-toggle"
 import { AppSidebar } from "@/components/ui/app-sidebar"
 import {
   Breadcrumb,
