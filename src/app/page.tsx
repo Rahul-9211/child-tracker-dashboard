@@ -7,7 +7,7 @@ export default function Home() {
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <ThemeToggle />
-      <Button onClick={() => router.push("/dashboard")}>Click me</Button>
+      <Button onClick={() => router.push("/login")}>Click me</Button>
      
     </div>
   );
