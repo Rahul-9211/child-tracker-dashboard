@@ -1,14 +1,24 @@
 "use client";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Button } from "@/components/ui/button";
+
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { auth } from "@/lib/auth-utils";
+
 export default function Home() {
   const router = useRouter();
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <ThemeToggle />
-      <Button onClick={() => router.push("/login")}>Click me</Button>
-     
-    </div>
-  );
+
+  useEffect(() => {
+    if (auth.isAuthenticated()) {
+      const user = auth.getUser();
+      if (user?.role === 'admin') {
+        router.push('/admin/dashboard');
+      } else {
+        router.push('/dashboard');
+      }
+    } else {
+      router.push('/login');
+    }
+  }, [router]);
+
+  return null;
 }

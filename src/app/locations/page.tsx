@@ -11,10 +11,20 @@ import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
+  BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { auth } from "@/lib/auth-utils";
 import {
@@ -25,20 +35,30 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+interface Location {
+  _id: string;
+  deviceId: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  altitude: number;
+  speed: number;
+  heading: number;
+  timestamp: string;
+  address: string;
+  isMoving: boolean;
+  batteryLevel: number;
+  networkType: string;
+}
+
 interface Device {
   _id: string;
   deviceId: string;
   deviceName: string;
-  model: string;
-  manufacturer: string;
-  osVersion: string;
-  batteryLevel: number;
-  lastSeen: string;
-  isOnline: boolean;
 }
 
-export default function DeviceInfo() {
-  const [device, setDevice] = useState<Device | null>(null);
+export default function Locations() {
+  const [locations, setLocations] = useState<Location[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -88,7 +108,7 @@ export default function DeviceInfo() {
   useEffect(() => {
     if (!selectedDevice) return;
 
-    const fetchDeviceInfo = async () => {
+    const fetchLocations = async () => {
       try {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -97,7 +117,7 @@ export default function DeviceInfo() {
         }
 
         setLoading(true);
-        const response = await fetch(`https://child-tracker-server.onrender.com/api/devices/${selectedDevice}`, {
+        const response = await fetch(`https://child-tracker-server.onrender.com/api/locations/device/${selectedDevice}/latest`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -108,11 +128,11 @@ export default function DeviceInfo() {
             auth.logout();
             return;
           }
-          throw new Error('Failed to fetch device info');
+          throw new Error('Failed to fetch locations');
         }
         
         const data = await response.json();
-        setDevice(data);
+        setLocations(Array.isArray(data) ? data : [data]);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -121,7 +141,7 @@ export default function DeviceInfo() {
       }
     };
 
-    fetchDeviceInfo();
+    fetchLocations();
   }, [selectedDevice]);
 
   const handleDeviceChange = (deviceId: string) => {
@@ -141,7 +161,11 @@ export default function DeviceInfo() {
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>
-                    <BreadcrumbPage>Device Info</BreadcrumbPage>
+                    <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>Locations</BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
@@ -164,61 +188,60 @@ export default function DeviceInfo() {
               </Select>
             </div>
 
-            {loading && <div>Loading device info...</div>}
+            {loading && <div>Loading locations...</div>}
             {error && <div className="text-red-500">Error: {error}</div>}
             
             {!selectedDevice && !loading && (
               <div className="text-center text-muted-foreground">
-                Please select a device to view information
+                Please select a device to view locations
               </div>
             )}
             
-            {device && !loading && !error && (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Device Details</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div>
-                        <span className="font-medium">Name:</span> {device.deviceName}
-                      </div>
-                      <div>
-                        <span className="font-medium">Model:</span> {device.model}
-                      </div>
-                      <div>
-                        <span className="font-medium">Manufacturer:</span> {device.manufacturer}
-                      </div>
-                      <div>
-                        <span className="font-medium">OS Version:</span> {device.osVersion}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Status</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div>
-                        <span className="font-medium">Status:</span>{" "}
-                        <span className={device.isOnline ? "text-green-500" : "text-red-500"}>
-                          {device.isOnline ? "Online" : "Offline"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Battery Level:</span> {device.batteryLevel}%
-                      </div>
-                      <div>
-                        <span className="font-medium">Last Seen:</span>{" "}
-                        {new Date(device.lastSeen).toLocaleString()}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+            {selectedDevice && !loading && !error && (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Timestamp</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Address</TableHead>
+                      <TableHead>Accuracy</TableHead>
+                      <TableHead>Speed</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Battery</TableHead>
+                      <TableHead>Network</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {locations.map((location) => (
+                      <TableRow key={location._id}>
+                        <TableCell>{new Date(location.timestamp).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div>Lat: {location.latitude.toFixed(6)}</div>
+                            <div>Lng: {location.longitude.toFixed(6)}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{location.address}</TableCell>
+                        <TableCell>{location.accuracy}m</TableCell>
+                        <TableCell>{location.speed} m/s</TableCell>
+                        <TableCell>
+                          <Badge variant={location.isMoving ? "default" : "secondary"}>
+                            {location.isMoving ? "Moving" : "Stationary"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={location.batteryLevel > 20 ? "default" : "destructive"}
+                          >
+                            {location.batteryLevel}%
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{location.networkType}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </main>

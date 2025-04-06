@@ -2,22 +2,19 @@
 
 import * as React from "react"
 import {
-  AudioWaveform,
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
-  GalleryVerticalEnd,
+  Phone,
+  MessageSquare,
+  Bell,
+  Smartphone,
   Map,
-  PieChart,
+  Users,
+  Activity,
   Settings2,
-  SquareTerminal,
+  Home,
 } from "lucide-react"
 
 import { NavMain } from "@/components/ui/nav-main"
-import { NavProjects } from "@/components/ui/nav-projects"
 import { NavUser } from "@/components/ui/nav-user"
-import { TeamSwitcher } from "@/components/ui/team-switcher"
 import {
   Sidebar,
   SidebarContent,
@@ -26,132 +23,63 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-// This is sample data.
 const data = {
   user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
+    name: "Admin",
+    email: "admin@example.com",
+    avatar: "/avatars/default.jpg",
   },
-  teams: [
-    {
-      name: "Acme Inc",
-      logo: GalleryVerticalEnd,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
-    },
-  ],
   navMain: [
     {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
+      title: "Dashboard",
+      url: "/dashboard",
+      icon: Home,
       isActive: true,
-      items: [
-        {
-          title: "Device Info",
-          url: "/device-info",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
     },
     {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
+      title: "Device Info",
+      url: "/device-info",
+      icon: Smartphone,
     },
     {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
-      ],
+      title: "Contacts",
+      url: "/contacts",
+      icon: Users,
+    },
+    {
+      title: "Locations",
+      url: "/locations",
+      icon: Map,
+    },
+    {
+      title: "Processes",
+      url: "/processes",
+      icon: Activity,
+    },
+    {
+      title: "Applications",
+      url: "/applications",
+      icon: Smartphone,
+    },
+    {
+      title: "Notifications",
+      url: "/notifications",
+      icon: Bell,
+    },
+    {
+      title: "SMS",
+      url: "/sms",
+      icon: MessageSquare,
+    },
+    {
+      title: "Calls",
+      url: "/calls",
+      icon: Phone,
     },
     {
       title: "Settings",
-      url: "#",
+      url: "/settings",
       icon: Settings2,
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
     },
   ],
 }
@@ -160,11 +88,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <div className="flex items-center justify-center p-4">
+          <h1 className="text-xl font-bold">Child Tracker</h1>
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />
