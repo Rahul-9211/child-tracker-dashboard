@@ -27,7 +27,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { auth } from "@/lib/auth-utils";
-import { useRouter } from "next/navigation";
 import {
   Select,
   SelectContent,
@@ -35,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import Image from "next/image";
 
 interface Contact {
   _id: string;
@@ -66,7 +66,6 @@ export default function Contacts() {
   const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -223,12 +222,28 @@ export default function Contacts() {
                       <TableRow key={contact._id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
-                            {contact.hasPhoto && (
-                              <img 
-                                src={contact.photoUri} 
-                                alt={contact.name}
-                                className="h-8 w-8 rounded-full"
-                              />
+                            {contact.hasPhoto ? (
+                              contact.photoUri.startsWith('content://') ? (
+                                <img 
+                                  src={contact.photoUri} 
+                                  alt={contact.name}
+                                  className="h-8 w-8 rounded-full"
+                                />
+                              ) : (
+                                <Image
+                                  src={contact.photoUri}
+                                  alt={contact.name}
+                                  width={32}
+                                  height={32}
+                                  className="h-8 w-8 rounded-full"
+                                />
+                              )
+                            ) : (
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                                <span className="text-xs font-medium">
+                                  {contact.name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
                             )}
                             {contact.name}
                           </div>

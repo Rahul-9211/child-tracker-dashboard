@@ -27,7 +27,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { auth } from "@/lib/auth-utils";
-import { useRouter } from "next/navigation";
 import {
   Select,
   SelectContent,
@@ -64,7 +63,6 @@ export default function Locations() {
   const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     const fetchDevices = async () => {

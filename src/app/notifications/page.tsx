@@ -29,6 +29,12 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { auth } from "@/lib/auth-utils";
 import { useRouter } from "next/navigation";
 
+interface NotificationExtras {
+  sender?: string;
+  messageId?: string;
+  [key: string]: string | undefined;
+}
+
 interface Notification {
   _id: string;
   deviceId: string;
@@ -42,11 +48,7 @@ interface Notification {
   isRead: boolean;
   isCleared: boolean;
   actions: string[];
-  extras: {
-    sender?: string;
-    messageId?: string;
-    [key: string]: any;
-  };
+  extras: NotificationExtras;
 }
 
 export default function Notifications() {

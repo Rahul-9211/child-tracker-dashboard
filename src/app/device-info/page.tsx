@@ -11,66 +11,93 @@ import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
-  BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { auth } from "@/lib/auth-utils";
-import { useRouter } from "next/navigation";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Device {
   _id: string;
   deviceId: string;
   deviceName: string;
-  deviceType: string;
-  osVersion: string;
+  model: string;
   manufacturer: string;
-  lastConnected: string;
-  status: string;
-  childId: string;
+  osVersion: string;
   batteryLevel: number;
-  installedApps: Array<{
-    appName: string;
-    packageName: string;
-    isRestricted: boolean;
-    _id: string;
-  }>;
-  settings: {
-    screenTimeLimit: number;
-    geofenceRadius: number;
-    allowedApps: string[];
-    blockedWebsites: string[];
-  };
+  lastSeen: string;
+  isOnline: boolean;
 }
 
 export default function DeviceInfo() {
+  const [device, setDevice] = useState<Device | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        // Get token from auth utility
         const token = localStorage.getItem('token');
         if (!token) {
           auth.logout();
           return;
         }
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/devices/`, {
+        const response = await fetch('https://child-tracker-server.onrender.com/api/devices', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            auth.logout();
+            return;
+          }
+          throw new Error('Failed to fetch devices');
+        }
+
+        const data = await response.json();
+        setDevices(data);
+        
+        const storedDeviceId = localStorage.getItem('deviceId');
+        if (storedDeviceId) {
+          setSelectedDevice(storedDeviceId);
+        } else if (data.length > 0) {
+          setSelectedDevice(data[0].deviceId);
+          localStorage.setItem('deviceId', data[0].deviceId);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      }
+    };
+
+    fetchDevices();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDevice) return;
+
+    const fetchDeviceInfo = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          auth.logout();
+          return;
+        }
+
+        setLoading(true);
+        const response = await fetch(`https://child-tracker-server.onrender.com/api/devices/${selectedDevice}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -78,27 +105,29 @@ export default function DeviceInfo() {
         
         if (!response.ok) {
           if (response.status === 401) {
-            // If unauthorized, clear everything and redirect to login
             auth.logout();
             return;
           }
-          throw new Error('Failed to fetch devices');
+          throw new Error('Failed to fetch device info');
         }
         
         const data = await response.json();
-        setDevices(data);
+        setDevice(data);
+        setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
-        if (err instanceof Error && err.message.includes('unauthorized')) {
-          auth.logout();
-        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchDevices();
-  }, [router]);
+    fetchDeviceInfo();
+  }, [selectedDevice]);
+
+  const handleDeviceChange = (deviceId: string) => {
+    setSelectedDevice(deviceId);
+    localStorage.setItem('deviceId', deviceId);
+  };
 
   return (
     <ProtectedRoute allowedRoles={["user", "admin"]}>
@@ -112,10 +141,6 @@ export default function DeviceInfo() {
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>
-                    <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
                     <BreadcrumbPage>Device Info</BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
@@ -124,73 +149,78 @@ export default function DeviceInfo() {
           </header>
 
           <main className="p-6">
-            {loading && <div>Loading devices...</div>}
+            <div className="mb-4">
+              <Select value={selectedDevice} onValueChange={handleDeviceChange}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select a device" />
+                </SelectTrigger>
+                <SelectContent>
+                  {devices.map((device) => (
+                    <SelectItem key={device._id} value={device.deviceId}>
+                      {device.deviceId}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {loading && <div>Loading device info...</div>}
             {error && <div className="text-red-500">Error: {error}</div>}
             
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Device Name</TableHead>
-                    <TableHead>Device ID</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>OS Version</TableHead>
-                    <TableHead>Manufacturer</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Battery</TableHead>
-                    <TableHead>Last Connected</TableHead>
-                    <TableHead>Settings</TableHead>
-                    <TableHead>Apps</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {devices.map((device) => (
-                    <TableRow key={device._id}>
-                      <TableCell className="font-medium">{device.deviceName}</TableCell>
-                      <TableCell>{device.deviceId}</TableCell>
-                      <TableCell>{device.deviceType}</TableCell>
-                      <TableCell>{device.osVersion}</TableCell>
-                      <TableCell>{device.manufacturer}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={device.status === 'active' ? 'default' : 'secondary'}
-                          className={device.status === 'active' ? 'bg-green-500' : 'bg-red-500'}
-                        >
-                          {device.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={device.batteryLevel > 20 ? 'default' : 'destructive'}
-                        >
-                          {device.batteryLevel}%
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{new Date(device.lastConnected).toLocaleString()}</TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <p>Screen Time: {device.settings.screenTimeLimit}min</p>
-                          <p>Geofence: {device.settings.geofenceRadius}m</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-[200px] space-y-1">
-                          {device.installedApps.map((app) => (
-                            <Badge 
-                              key={app._id}
-                              variant={app.isRestricted ? 'destructive' : 'default'}
-                              className="mr-1"
-                            >
-                              {app.appName}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            {!selectedDevice && !loading && (
+              <div className="text-center text-muted-foreground">
+                Please select a device to view information
+              </div>
+            )}
+            
+            {device && !loading && !error && (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Device Details</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div>
+                        <span className="font-medium">Name:</span> {device.deviceName}
+                      </div>
+                      <div>
+                        <span className="font-medium">Model:</span> {device.model}
+                      </div>
+                      <div>
+                        <span className="font-medium">Manufacturer:</span> {device.manufacturer}
+                      </div>
+                      <div>
+                        <span className="font-medium">OS Version:</span> {device.osVersion}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Status</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div>
+                        <span className="font-medium">Status:</span>{" "}
+                        <span className={device.isOnline ? "text-green-500" : "text-red-500"}>
+                          {device.isOnline ? "Online" : "Offline"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Battery Level:</span> {device.batteryLevel}%
+                      </div>
+                      <div>
+                        <span className="font-medium">Last Seen:</span>{" "}
+                        {new Date(device.lastSeen).toLocaleString()}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </main>
         </SidebarInset>
       </SidebarProvider>

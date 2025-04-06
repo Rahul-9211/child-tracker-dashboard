@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { GalleryVerticalEnd } from "lucide-react"
+import Image from "next/image"
 
 import { LoginForm } from "@/components/ui/login-form"
 import { auth } from '@/lib/auth-utils'
@@ -37,13 +38,16 @@ export default function LoginPage() {
             <LoginForm />
           </div>
         </div>
+        <Image 
+          src="/logo.png" 
+          alt="Logo"
+          width={150}
+          height={150}
+          className="mb-8"
+        />
       </div>
       <div className="relative hidden bg-muted lg:block">
-        <img
-          src="/placeholder.svg"
-          alt="Image"
-          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
-        />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5" />
       </div>
     </div>
   )
