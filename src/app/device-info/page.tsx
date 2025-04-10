@@ -11,108 +11,150 @@ import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
+  BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { auth } from "@/lib/auth-utils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { DeviceSelector } from "@/components/shared/device-selector";
+import { DataTable } from "@/components/shared/data-table";
+import { fetchWithAuth } from "@/lib/api-utils";
+import { useDevice } from "@/hooks/use-device";
 
-interface Device {
+interface InstalledApp {
+  appName: string;
+  packageName: string;
+  isRestricted: boolean;
+  _id: string;
+}
+
+interface DeviceSettings {
+  screenTimeLimit: number;
+  geofenceRadius: number;
+  allowedApps: string[];
+  blockedWebsites: string[];
+}
+
+interface DeviceInfo {
   _id: string;
   deviceId: string;
   deviceName: string;
-  model: string;
-  manufacturer: string;
+  deviceType: string;
   osVersion: string;
+  manufacturer: string;
+  lastConnected: string;
+  status: string;
+  childId: string;
   batteryLevel: number;
-  lastSeen: string;
-  isOnline: boolean;
+  installedApps: InstalledApp[];
+  settings: DeviceSettings;
+  createdAt: string;
+  updatedAt: string;
 }
 
+const deviceInfoColumns = [
+  {
+    key: 'deviceName',
+    header: 'Device Name',
+    render: (info: DeviceInfo) => (
+      <div className="flex flex-col">
+        <span className="font-medium">{info.deviceName}</span>
+        <span className="text-sm text-muted-foreground">{info.deviceId}</span>
+      </div>
+    )
+  },
+  {
+    key: 'deviceType',
+    header: 'Device Type',
+    render: (info: DeviceInfo) => info.deviceType
+  },
+  {
+    key: 'osVersion',
+    header: 'OS Version',
+    render: (info: DeviceInfo) => info.osVersion
+  },
+  {
+    key: 'manufacturer',
+    header: 'Manufacturer',
+    render: (info: DeviceInfo) => info.manufacturer
+  },
+  {
+    key: 'status',
+    header: 'Status',
+    render: (info: DeviceInfo) => (
+      <span className={`px-2 py-1 rounded-full text-xs ${
+        info.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+      }`}>
+        {info.status}
+      </span>
+    )
+  },
+  {
+    key: 'batteryLevel',
+    header: 'Battery Level',
+    render: (info: DeviceInfo) => `${info.batteryLevel}%`
+  },
+  {
+    key: 'lastConnected',
+    header: 'Last Connected',
+    render: (info: DeviceInfo) => new Date(info.lastConnected).toLocaleString()
+  },
+  {
+    key: 'settings',
+    header: 'Settings',
+    render: (info: DeviceInfo) => (
+      <div className="flex flex-col gap-1">
+        <span className="text-sm">Screen Time: {info.settings.screenTimeLimit} mins</span>
+        <span className="text-sm">Geofence: {info.settings.geofenceRadius}m</span>
+        <span className="text-sm">Allowed Apps: {info.settings.allowedApps.length}</span>
+        <span className="text-sm">Blocked Sites: {info.settings.blockedWebsites.length}</span>
+      </div>
+    )
+  },
+  {
+    key: 'installedApps',
+    header: 'Installed Apps',
+    render: (info: DeviceInfo) => (
+      <div className="flex flex-col gap-1">
+        {info.installedApps.map((app) => (
+          <div key={app._id} className="flex items-center gap-2">
+            <span className="text-sm">{app.appName}</span>
+            {app.isRestricted && (
+              <span className="px-1 py-0.5 rounded text-xs bg-yellow-100 text-yellow-800">
+                Restricted
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
+];
+
 export default function DeviceInfo() {
-  const [device, setDevice] = useState<Device | null>(null);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<string>("");
+  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  const { selectedDevice, setSelectedDevice, loading: deviceLoading, error: deviceError } = useDevice();
 
   useEffect(() => {
-    const fetchDevices = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          auth.logout();
-          return;
-        }
-
-        const response = await fetch('https://child-tracker-server.onrender.com/api/devices', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error('Failed to fetch devices');
-        }
-
-        const data = await response.json();
-        setDevices(data);
-        
-        const storedDeviceId = localStorage.getItem('deviceId');
-        if (storedDeviceId) {
-          setSelectedDevice(storedDeviceId);
-        } else if (data.length > 0) {
-          setSelectedDevice(data[0].deviceId);
-          localStorage.setItem('deviceId', data[0].deviceId);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      }
-    };
-
-    fetchDevices();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedDevice) return;
+    if (!selectedDevice) {
+      setLoading(false);
+      return;
+    }
 
     const fetchDeviceInfo = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          auth.logout();
+        setLoading(true);
+        const { data, error } = await fetchWithAuth<DeviceInfo[]>(`devices/${selectedDevice}`);
+        
+        if (error) {
+          setError(error);
           return;
         }
-
-        setLoading(true);
-        const response = await fetch(`https://child-tracker-server.onrender.com/api/devices/${selectedDevice}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (!response.ok) {
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error('Failed to fetch device info');
-        }
-        
-        const data = await response.json();
-        setDevice(data);
+        setDeviceInfo([data] || []);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -123,11 +165,6 @@ export default function DeviceInfo() {
 
     fetchDeviceInfo();
   }, [selectedDevice]);
-
-  const handleDeviceChange = (deviceId: string) => {
-    setSelectedDevice(deviceId);
-    localStorage.setItem('deviceId', deviceId);
-  };
 
   return (
     <ProtectedRoute allowedRoles={["user", "admin"]}>
@@ -141,6 +178,10 @@ export default function DeviceInfo() {
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>
+                    <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
                     <BreadcrumbPage>Device Info</BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
@@ -149,77 +190,26 @@ export default function DeviceInfo() {
           </header>
 
           <main className="p-6">
-            <div className="mb-4">
-              <Select value={selectedDevice} onValueChange={handleDeviceChange}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select a device" />
-                </SelectTrigger>
-                <SelectContent>
-                  {devices.map((device) => (
-                    <SelectItem key={device._id} value={device.deviceId}>
-                      {device.deviceId}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <DeviceSelector 
+              selectedDevice={selectedDevice} 
+              onDeviceChange={setSelectedDevice} 
+            />
 
-            {loading && <div>Loading device info...</div>}
-            {error && <div className="text-red-500">Error: {error}</div>}
+            {(loading || deviceLoading) && <div>Loading device info...</div>}
+            {(error || deviceError) && <div className="text-red-500">Error: {error || deviceError}</div>}
             
-            {!selectedDevice && !loading && (
+            {!selectedDevice && !loading && !deviceLoading && (
               <div className="text-center text-muted-foreground">
-                Please select a device to view information
+                Please select a device to view device info
               </div>
             )}
             
-            {device && !loading && !error && (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Device Details</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div>
-                        <span className="font-medium">Name:</span> {device.deviceName}
-                      </div>
-                      <div>
-                        <span className="font-medium">Model:</span> {device.model}
-                      </div>
-                      <div>
-                        <span className="font-medium">Manufacturer:</span> {device.manufacturer}
-                      </div>
-                      <div>
-                        <span className="font-medium">OS Version:</span> {device.osVersion}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Status</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div>
-                        <span className="font-medium">Status:</span>{" "}
-                        <span className={device.isOnline ? "text-green-500" : "text-red-500"}>
-                          {device.isOnline ? "Online" : "Offline"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Battery Level:</span> {device.batteryLevel}%
-                      </div>
-                      <div>
-                        <span className="font-medium">Last Seen:</span>{" "}
-                        {new Date(device.lastSeen).toLocaleString()}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+            {selectedDevice && !loading && !deviceLoading && !error && !deviceError && (
+              <DataTable
+                data={deviceInfo}
+                columns={deviceInfoColumns}
+                emptyMessage="No device info found"
+              />
             )}
           </main>
         </SidebarInset>

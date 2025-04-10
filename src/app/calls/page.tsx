@@ -16,24 +16,11 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { auth } from "@/lib/auth-utils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { DeviceSelector } from "@/components/shared/device-selector";
+import { DataTable } from "@/components/shared/data-table";
+import { fetchWithAuth } from "@/lib/api-utils";
+import { useDevice } from "@/hooks/use-device";
 
 interface Location {
   latitude: number;
@@ -74,109 +61,130 @@ interface CallResponse {
   };
 }
 
-interface Device {
-  _id: string;
-  deviceId: string;
-  deviceName: string;
-}
+const callsColumns = [
+  {
+    key: 'contact',
+    header: 'Contact',
+    render: (record: CallRecord) => (
+      <div className="flex flex-col">
+        <span className="font-medium">{record.metadata.contactName}</span>
+        <span className="text-xs text-muted-foreground">
+          {record.type === 'incoming' ? record.caller : record.receiver}
+        </span>
+      </div>
+    )
+  },
+  {
+    key: 'type',
+    header: 'Type',
+    render: (record: CallRecord) => (
+      <span className={`px-2 py-1 rounded-full text-xs ${
+        record.type === 'incoming' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+      }`}>
+        {record.type}
+      </span>
+    )
+  },
+  {
+    key: 'duration',
+    header: 'Duration',
+    render: (record: CallRecord) => {
+      const minutes = Math.floor(record.duration / 60);
+      const seconds = record.duration % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+  },
+  {
+    key: 'timestamp',
+    header: 'Time',
+    render: (record: CallRecord) => new Date(record.timestamp).toLocaleString()
+  },
+  {
+    key: 'status',
+    header: 'Status',
+    render: (record: CallRecord) => (
+      <span className={`px-2 py-1 rounded-full text-xs ${
+        record.status === 'completed' ? 'bg-green-100 text-green-800' :
+        record.status === 'missed' ? 'bg-red-100 text-red-800' :
+        'bg-gray-100 text-gray-800'
+      }`}>
+        {record.status}
+      </span>
+    )
+  },
+  {
+    key: 'location',
+    header: 'Location',
+    render: (record: CallRecord) => (
+      <div className="flex flex-col">
+        <span>{record.metadata.location.address}</span>
+        <span className="text-xs text-muted-foreground">
+          {record.metadata.location.latitude}, {record.metadata.location.longitude}
+        </span>
+      </div>
+    )
+  },
+  {
+    key: 'category',
+    header: 'Category',
+    render: (record: CallRecord) => (
+      <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+        {record.metadata.category}
+      </span>
+    )
+  },
+  {
+    key: 'spam',
+    header: 'Spam',
+    render: (record: CallRecord) => (
+      <span className={`px-2 py-1 rounded-full text-xs ${
+        record.metadata.isSpam ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+      }`}>
+        {record.metadata.isSpam ? 'Yes' : 'No'}
+      </span>
+    )
+  },
+  {
+    key: 'blocked',
+    header: 'Blocked',
+    render: (record: CallRecord) => (
+      <span className={`px-2 py-1 rounded-full text-xs ${
+        record.isBlocked ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+      }`}>
+        {record.isBlocked ? 'Yes' : 'No'}
+      </span>
+    )
+  }
+];
 
 export default function Calls() {
   const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchDevices = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.log('No token found, logging out');
-          auth.logout();
-          return;
-        }
-
-        console.log('Fetching devices...');
-        const response = await fetch('https://child-tracker-server.onrender.com/api/devices', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          console.error('Failed to fetch devices:', response.status, response.statusText);
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error(`Failed to fetch devices: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('Devices fetched:', data);
-        setDevices(data || []);
-        
-        // If there's a device in localStorage, use it
-        const storedDeviceId = localStorage.getItem('deviceId');
-        if (storedDeviceId) {
-          console.log('Using stored device ID:', storedDeviceId);
-          setSelectedDevice(storedDeviceId);
-        } else if (data?.length > 0) {
-          // Otherwise, select the first device
-          console.log('Selecting first device:', data[0]?.deviceId);
-          setSelectedDevice(data[0]?.deviceId || '');
-          localStorage.setItem('deviceId', data[0]?.deviceId || '');
-        }
-      } catch (err) {
-        console.error('Error fetching devices:', err);
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      }
-    };
-
-    fetchDevices();
-  }, []);
+  
+  const { selectedDevice, setSelectedDevice, loading: deviceLoading, error: deviceError } = useDevice();
 
   useEffect(() => {
     if (!selectedDevice) {
-      console.log('No device selected, skipping calls fetch');
+      setLoading(false);
       return;
     }
 
     const fetchCalls = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.log('No token found, logging out');
-          auth.logout();
+        setLoading(true);
+        const { data, error } = await fetchWithAuth<CallResponse>(`calls/device/${selectedDevice}`);
+        
+        if (error) {
+          setError(error);
           return;
         }
 
-        console.log('Fetching calls for device:', selectedDevice);
-        setLoading(true);
-        const response = await fetch(`https://child-tracker-server.onrender.com/api/calls/device/${selectedDevice}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (!response.ok) {
-          console.error('Failed to fetch calls:', response.status, response.statusText);
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error(`Failed to fetch calls: ${response.status} ${response.statusText}`);
-        }
-        
-        const data: CallResponse = await response.json();
-        console.log('Calls data fetched:', data);
-        setCallRecords(data?.callRecords || []);
-        setPagination(data?.pagination || { total: 0, page: 1, pages: 1 });
+        setCallRecords(data.callRecords || []);
+        setPagination(data.pagination || { total: 0, page: 1, pages: 1 });
         setError(null);
       } catch (err) {
-        console.error('Error fetching calls:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
@@ -185,17 +193,6 @@ export default function Calls() {
 
     fetchCalls();
   }, [selectedDevice]);
-
-  const handleDeviceChange = (deviceId: string) => {
-    setSelectedDevice(deviceId);
-    localStorage.setItem('deviceId', deviceId);
-  };
-
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
 
   return (
     <ProtectedRoute allowedRoles={["user", "admin"]}>
@@ -221,104 +218,26 @@ export default function Calls() {
           </header>
 
           <main className="p-6">
-            <div className="mb-4">
-              <Select value={selectedDevice} onValueChange={handleDeviceChange}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select a device" />
-                </SelectTrigger>
-                <SelectContent>
-                  {devices.map((device) => (
-                    <SelectItem key={device._id} value={device.deviceId}>
-                      {device.deviceId}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <DeviceSelector 
+              selectedDevice={selectedDevice} 
+              onDeviceChange={setSelectedDevice} 
+            />
 
-            {loading && <div>Loading call records...</div>}
-            {error && <div className="text-red-500">Error: {error}</div>}
+            {(loading || deviceLoading) && <div>Loading call records...</div>}
+            {(error || deviceError) && <div className="text-red-500">Error: {error || deviceError}</div>}
             
-            {!selectedDevice && !loading && (
+            {!selectedDevice && !loading && !deviceLoading && (
               <div className="text-center text-muted-foreground">
                 Please select a device to view call records
               </div>
             )}
             
-            {selectedDevice && !loading && !error && (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Spam</TableHead>
-                      <TableHead>Blocked</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {callRecords.map((record) => (
-                      <TableRow key={record?._id}>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{record?.metadata?.contactName || 'Unknown'}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {record?.type === 'incoming' ? record?.caller : record?.receiver}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={record?.type === 'incoming' ? 'default' : 'secondary'}>
-                            {record?.type || 'Unknown'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{formatDuration(record?.duration || 0)}</TableCell>
-                        <TableCell>{record?.timestamp ? new Date(record.timestamp).toLocaleString() : 'Unknown'}</TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={
-                              record?.status === 'completed' ? 'default' : 
-                              record?.status === 'missed' ? 'destructive' : 'secondary'
-                            }
-                          >
-                            {record?.status || 'Unknown'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span>{record?.metadata?.location?.address || 'Unknown'}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {record?.metadata?.location ? 
-                                `${record.metadata.location.latitude}, ${record.metadata.location.longitude}` : 
-                                'No location data'}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {record?.metadata?.category || 'Unknown'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={record?.metadata?.isSpam ? 'destructive' : 'secondary'}>
-                            {record?.metadata?.isSpam ? 'Yes' : 'No'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={record?.isBlocked ? 'destructive' : 'secondary'}>
-                            {record?.isBlocked ? 'Yes' : 'No'}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+            {selectedDevice && !loading && !deviceLoading && !error && !deviceError && (
+              <DataTable
+                data={callRecords}
+                columns={callsColumns}
+                emptyMessage="No call records found"
+              />
             )}
           </main>
         </SidebarInset>

@@ -1,9 +1,11 @@
 "use client"
 
+import { useEffect, useState } from "react";
 import { AppSidebar } from "@/components/ui/app-sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb"
@@ -14,11 +16,57 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { ProtectedRoute } from "@/components/auth/protected-route"
+import { DeviceSelector } from "@/components/shared/device-selector"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Activity, Bell, Map, MessageSquare, Phone, Smartphone, Users } from "lucide-react"
-import Link from "next/link"
+import { fetchWithAuth } from "@/lib/api-utils"
+import { useDevice } from "@/hooks/use-device"
 
-export default function UserDashboard() {
+interface DashboardStats {
+  totalContacts: number;
+  totalCalls: number;
+  totalSMS: number;
+  totalLocations: number;
+  totalApplications: number;
+  totalProcesses: number;
+  totalNotifications: number;
+  lastUpdated: string;
+}
+
+export default function Dashboard() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const { selectedDevice, setSelectedDevice, loading: deviceLoading, error: deviceError } = useDevice();
+
+  useEffect(() => {
+    if (!selectedDevice) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await fetchWithAuth<DashboardStats>(`dashboard/stats/${selectedDevice}`);
+        
+        if (error) {
+          setError(error);
+          return;
+        }
+
+        setStats(data || null);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [selectedDevice]);
+
   return (
     <ProtectedRoute allowedRoles={["user", "admin"]}>
       <SidebarProvider>
@@ -39,111 +87,97 @@ export default function UserDashboard() {
           </header>
 
           <main className="p-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Link href="/device-info">
-                <Card className="hover:bg-accent cursor-pointer transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Device Info</CardTitle>
-                    <Smartphone className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">Active</div>
-                    <p className="text-xs text-muted-foreground">View device details and status</p>
-                  </CardContent>
-                </Card>
-              </Link>
+            <DeviceSelector 
+              selectedDevice={selectedDevice} 
+              onDeviceChange={setSelectedDevice} 
+            />
 
-              <Link href="/contacts">
-                <Card className="hover:bg-accent cursor-pointer transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Contacts</CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
+            {(loading || deviceLoading) && <div>Loading dashboard stats...</div>}
+            {(error || deviceError) && <div className="text-red-500">Error: {error || deviceError}</div>}
+            
+            {!selectedDevice && !loading && !deviceLoading && (
+              <div className="text-center text-muted-foreground">
+                Please select a device to view dashboard stats
+              </div>
+            )}
+            
+            {stats && !loading && !deviceLoading && !error && !deviceError && (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Contacts</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">0</div>
-                    <p className="text-xs text-muted-foreground">Total contacts</p>
+                    <div className="text-2xl font-bold">{stats.totalContacts}</div>
                   </CardContent>
                 </Card>
-              </Link>
 
-              <Link href="/locations">
-                <Card className="hover:bg-accent cursor-pointer transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Locations</CardTitle>
-                    <Map className="h-4 w-4 text-muted-foreground" />
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Calls</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">0</div>
-                    <p className="text-xs text-muted-foreground">Location updates</p>
+                    <div className="text-2xl font-bold">{stats.totalCalls}</div>
                   </CardContent>
                 </Card>
-              </Link>
 
-              <Link href="/process-activities">
-                <Card className="hover:bg-accent cursor-pointer transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Processes</CardTitle>
-                    <Activity className="h-4 w-4 text-muted-foreground" />
+                <Card>
+                  <CardHeader>
+                    <CardTitle>SMS</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">0</div>
-                    <p className="text-xs text-muted-foreground">Active processes</p>
+                    <div className="text-2xl font-bold">{stats.totalSMS}</div>
                   </CardContent>
                 </Card>
-              </Link>
 
-              <Link href="/applications">
-                <Card className="hover:bg-accent cursor-pointer transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Applications</CardTitle>
-                    <Smartphone className="h-4 w-4 text-muted-foreground" />
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Locations</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">0</div>
-                    <p className="text-xs text-muted-foreground">Installed apps</p>
+                    <div className="text-2xl font-bold">{stats.totalLocations}</div>
                   </CardContent>
                 </Card>
-              </Link>
 
-              <Link href="/notifications">
-                <Card className="hover:bg-accent cursor-pointer transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Notifications</CardTitle>
-                    <Bell className="h-4 w-4 text-muted-foreground" />
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Applications</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">0</div>
-                    <p className="text-xs text-muted-foreground">Unread notifications</p>
+                    <div className="text-2xl font-bold">{stats.totalApplications}</div>
                   </CardContent>
                 </Card>
-              </Link>
 
-              <Link href="/sms">
-                <Card className="hover:bg-accent cursor-pointer transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">SMS</CardTitle>
-                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Processes</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">0</div>
-                    <p className="text-xs text-muted-foreground">Unread messages</p>
+                    <div className="text-2xl font-bold">{stats.totalProcesses}</div>
                   </CardContent>
                 </Card>
-              </Link>
 
-              <Link href="/calls">
-                <Card className="hover:bg-accent cursor-pointer transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Calls</CardTitle>
-                    <Phone className="h-4 w-4 text-muted-foreground" />
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Notifications</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">0</div>
-                    <p className="text-xs text-muted-foreground">Recent calls</p>
+                    <div className="text-2xl font-bold">{stats.totalNotifications}</div>
                   </CardContent>
                 </Card>
-              </Link>
-            </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Last Updated</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm text-muted-foreground">
+                      {new Date(stats.lastUpdated).toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </main>
         </SidebarInset>
       </SidebarProvider>

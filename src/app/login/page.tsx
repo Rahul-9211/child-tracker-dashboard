@@ -15,7 +15,7 @@ export default function LoginPage() {
     if (auth.isAuthenticated()) {
       const user = auth.getUser()
       if (user?.role === 'admin') {
-        router.push('/admin/dashboard')
+        router.push('/dashboard')
       } else {
         router.push('/dashboard')
       }

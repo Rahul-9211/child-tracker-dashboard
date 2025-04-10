@@ -16,24 +16,11 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { auth } from "@/lib/auth-utils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { DeviceSelector } from "@/components/shared/device-selector";
+import { DataTable } from "@/components/shared/data-table";
+import { fetchWithAuth } from "@/lib/api-utils";
+import { useDevice } from "@/hooks/use-device";
 import Image from "next/image";
 
 interface Contact {
@@ -54,90 +41,128 @@ interface Contact {
   updatedAt: string;
 }
 
-interface Device {
-  _id: string;
-  deviceId: string;
-  deviceName: string;
-}
+const contactsColumns = [
+  {
+    key: 'name',
+    header: 'Name',
+    render: (contact: Contact) => (
+      <div className="flex items-center gap-2">
+        {contact.hasPhoto ? (
+          contact.photoUri.startsWith('content://') ? (
+            <img 
+              src={contact.photoUri} 
+              alt={contact.name}
+              className="h-8 w-8 rounded-full"
+            />
+          ) : (
+            <Image
+              src={contact.photoUri}
+              alt={contact.name}
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-full"
+            />
+          )
+        ) : (
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+            <span className="text-xs font-medium">
+              {contact.name.charAt(0).toUpperCase()}
+            </span>
+          </div>
+        )}
+        <span className="font-medium">{contact.name}</span>
+      </div>
+    )
+  },
+  {
+    key: 'phoneNumbers',
+    header: 'Phone Numbers',
+    render: (contact: Contact) => (
+      <div className="flex flex-col">
+        {contact.phoneNumbers.map((phone, index) => (
+          <span key={index}>{phone}</span>
+        ))}
+      </div>
+    )
+  },
+  {
+    key: 'emailAddresses',
+    header: 'Email Addresses',
+    render: (contact: Contact) => (
+      <div className="flex flex-col">
+        {contact.emailAddresses.map((email, index) => (
+          <span key={index}>{email}</span>
+        ))}
+      </div>
+    )
+  },
+  {
+    key: 'groups',
+    header: 'Groups',
+    render: (contact: Contact) => (
+      <div className="flex flex-wrap gap-1">
+        {contact.groups.map((group, index) => (
+          <span key={index} className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+            {group}
+          </span>
+        ))}
+      </div>
+    )
+  },
+  {
+    key: 'notes',
+    header: 'Notes',
+    render: (contact: Contact) => contact.notes
+  },
+  {
+    key: 'status',
+    header: 'Status',
+    render: (contact: Contact) => (
+      <div className="flex flex-col gap-1">
+        {contact.isFavorite && (
+          <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+            Favorite
+          </span>
+        )}
+        {contact.isDeleted && (
+          <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
+            Deleted
+          </span>
+        )}
+      </div>
+    )
+  },
+  {
+    key: 'lastUpdated',
+    header: 'Last Updated',
+    render: (contact: Contact) => new Date(contact.lastUpdated).toLocaleString()
+  }
+];
 
 export default function Contacts() {
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  const { selectedDevice, setSelectedDevice, loading: deviceLoading, error: deviceError } = useDevice();
 
   useEffect(() => {
-    const fetchDevices = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          auth.logout();
-          return;
-        }
-
-        const response = await fetch('https://child-tracker-server.onrender.com/api/devices', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error('Failed to fetch devices');
-        }
-
-        const data = await response.json();
-        setDevices(data);
-        
-        // If there's a device in localStorage, use it
-        const storedDeviceId = localStorage.getItem('deviceId');
-        if (storedDeviceId) {
-          setSelectedDevice(storedDeviceId);
-        } else if (data.length > 0) {
-          // Otherwise, select the first device
-          setSelectedDevice(data[0].deviceId);
-          localStorage.setItem('deviceId', data[0].deviceId);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      }
-    };
-
-    fetchDevices();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedDevice) return;
+    if (!selectedDevice) {
+      setLoading(false);
+      return;
+    }
 
     const fetchContacts = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          auth.logout();
+        setLoading(true);
+        const { data, error } = await fetchWithAuth<Contact[]>(`contacts/device/${selectedDevice}`);
+        
+        if (error) {
+          setError(error);
           return;
         }
 
-        setLoading(true);
-        const response = await fetch(`https://child-tracker-server.onrender.com/api/contacts/device/${selectedDevice}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (!response.ok) {
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error('Failed to fetch contacts');
-        }
-        
-        const data = await response.json();
-        setContacts(data);
+        setContacts(data || []);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -148,11 +173,6 @@ export default function Contacts() {
 
     fetchContacts();
   }, [selectedDevice]);
-
-  const handleDeviceChange = (deviceId: string) => {
-    setSelectedDevice(deviceId);
-    localStorage.setItem('deviceId', deviceId);
-  };
 
   return (
     <ProtectedRoute allowedRoles={["user", "admin"]}>
@@ -178,116 +198,26 @@ export default function Contacts() {
           </header>
 
           <main className="p-6">
-            <div className="mb-4">
-              <Select value={selectedDevice} onValueChange={handleDeviceChange}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select a device" />
-                </SelectTrigger>
-                <SelectContent>
-                  {devices.map((device) => (
-                    <SelectItem key={device._id} value={device.deviceId}>
-                      {device.deviceId}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <DeviceSelector 
+              selectedDevice={selectedDevice} 
+              onDeviceChange={setSelectedDevice} 
+            />
 
-            {loading && <div>Loading contacts...</div>}
-            {error && <div className="text-red-500">Error: {error}</div>}
+            {(loading || deviceLoading) && <div>Loading contacts...</div>}
+            {(error || deviceError) && <div className="text-red-500">Error: {error || deviceError}</div>}
             
-            {!selectedDevice && !loading && (
+            {!selectedDevice && !loading && !deviceLoading && (
               <div className="text-center text-muted-foreground">
                 Please select a device to view contacts
               </div>
             )}
             
-            {selectedDevice && !loading && !error && (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Phone Numbers</TableHead>
-                      <TableHead>Email Addresses</TableHead>
-                      <TableHead>Groups</TableHead>
-                      <TableHead>Favorite</TableHead>
-                      <TableHead>Last Updated</TableHead>
-                      <TableHead>Notes</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {contacts.map((contact) => (
-                      <TableRow key={contact._id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {contact.hasPhoto ? (
-                              contact.photoUri.startsWith('content://') ? (
-                                <img 
-                                  src={contact.photoUri} 
-                                  alt={contact.name}
-                                  className="h-8 w-8 rounded-full"
-                                />
-                              ) : (
-                                <Image
-                                  src={contact.photoUri}
-                                  alt={contact.name}
-                                  width={32}
-                                  height={32}
-                                  className="h-8 w-8 rounded-full"
-                                />
-                              )
-                            ) : (
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                                <span className="text-xs font-medium">
-                                  {contact.name.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                            )}
-                            {contact.name}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            {contact.phoneNumbers.map((phone, index) => (
-                              <div key={index} className="text-sm">{phone}</div>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            {contact.emailAddresses.map((email, index) => (
-                              <div key={index} className="text-sm">{email}</div>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {contact.groups.map((group, index) => (
-                              <Badge key={index} variant="secondary">
-                                {group}
-                              </Badge>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={contact.isFavorite ? "default" : "secondary"}>
-                            {contact.isFavorite ? "Yes" : "No"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{new Date(contact.lastUpdated).toLocaleString()}</TableCell>
-                        <TableCell>{contact.notes}</TableCell>
-                        <TableCell>
-                          <Badge variant={contact.isDeleted ? "destructive" : "default"}>
-                            {contact.isDeleted ? "Deleted" : "Active"}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+            {selectedDevice && !loading && !deviceLoading && !error && !deviceError && (
+              <DataTable
+                data={contacts}
+                columns={contactsColumns}
+                emptyMessage="No contacts found"
+              />
             )}
           </main>
         </SidebarInset>

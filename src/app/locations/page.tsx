@@ -16,24 +16,11 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { auth } from "@/lib/auth-utils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { DeviceSelector } from "@/components/shared/device-selector";
+import { DataTable } from "@/components/shared/data-table";
+import { fetchWithAuth } from "@/lib/api-utils";
+import { useDevice } from "@/hooks/use-device";
 
 interface Location {
   _id: string;
@@ -43,96 +30,80 @@ interface Location {
   accuracy: number;
   altitude: number;
   speed: number;
-  heading: number;
-  timestamp: string;
+  bearing: number;
   address: string;
-  isMoving: boolean;
-  batteryLevel: number;
-  networkType: string;
+  timestamp: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-interface Device {
-  _id: string;
-  deviceId: string;
-  deviceName: string;
-}
+const locationsColumns = [
+  {
+    key: 'address',
+    header: 'Address',
+    render: (location: Location) => location.address
+  },
+  {
+    key: 'coordinates',
+    header: 'Coordinates',
+    render: (location: Location) => (
+      <div className="flex flex-col">
+        <span>Lat: {location.latitude}</span>
+        <span>Lng: {location.longitude}</span>
+      </div>
+    )
+  },
+  {
+    key: 'accuracy',
+    header: 'Accuracy',
+    render: (location: Location) => `${location.accuracy}m`
+  },
+  {
+    key: 'altitude',
+    header: 'Altitude',
+    render: (location: Location) => `${location.altitude}m`
+  },
+  {
+    key: 'speed',
+    header: 'Speed',
+    render: (location: Location) => `${location.speed}m/s`
+  },
+  {
+    key: 'bearing',
+    header: 'Bearing',
+    render: (location: Location) => `${location.bearing}°`
+  },
+  {
+    key: 'timestamp',
+    header: 'Time',
+    render: (location: Location) => new Date(location.timestamp).toLocaleString()
+  }
+];
 
 export default function Locations() {
   const [locations, setLocations] = useState<Location[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  const { selectedDevice, setSelectedDevice, loading: deviceLoading, error: deviceError } = useDevice();
 
   useEffect(() => {
-    const fetchDevices = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          auth.logout();
-          return;
-        }
-
-        const response = await fetch('https://child-tracker-server.onrender.com/api/devices', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error('Failed to fetch devices');
-        }
-
-        const data = await response.json();
-        setDevices(data);
-        
-        const storedDeviceId = localStorage.getItem('deviceId');
-        if (storedDeviceId) {
-          setSelectedDevice(storedDeviceId);
-        } else if (data.length > 0) {
-          setSelectedDevice(data[0].deviceId);
-          localStorage.setItem('deviceId', data[0].deviceId);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      }
-    };
-
-    fetchDevices();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedDevice) return;
+    if (!selectedDevice) {
+      setLoading(false);
+      return;
+    }
 
     const fetchLocations = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          auth.logout();
+        setLoading(true);
+        const { data, error } = await fetchWithAuth<Location[]>(`locations/device/${selectedDevice}`);
+        
+        if (error) {
+          setError(error);
           return;
         }
 
-        setLoading(true);
-        const response = await fetch(`https://child-tracker-server.onrender.com/api/locations/device/${selectedDevice}/latest`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (!response.ok) {
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error('Failed to fetch locations');
-        }
-        
-        const data = await response.json();
-        setLocations(Array.isArray(data) ? data : [data]);
+        setLocations(data || []);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -143,11 +114,6 @@ export default function Locations() {
 
     fetchLocations();
   }, [selectedDevice]);
-
-  const handleDeviceChange = (deviceId: string) => {
-    setSelectedDevice(deviceId);
-    localStorage.setItem('deviceId', deviceId);
-  };
 
   return (
     <ProtectedRoute allowedRoles={["user", "admin"]}>
@@ -173,76 +139,26 @@ export default function Locations() {
           </header>
 
           <main className="p-6">
-            <div className="mb-4">
-              <Select value={selectedDevice} onValueChange={handleDeviceChange}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select a device" />
-                </SelectTrigger>
-                <SelectContent>
-                  {devices.map((device) => (
-                    <SelectItem key={device._id} value={device.deviceId}>
-                      {device.deviceId}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <DeviceSelector 
+              selectedDevice={selectedDevice} 
+              onDeviceChange={setSelectedDevice} 
+            />
 
-            {loading && <div>Loading locations...</div>}
-            {error && <div className="text-red-500">Error: {error}</div>}
+            {(loading || deviceLoading) && <div>Loading locations...</div>}
+            {(error || deviceError) && <div className="text-red-500">Error: {error || deviceError}</div>}
             
-            {!selectedDevice && !loading && (
+            {!selectedDevice && !loading && !deviceLoading && (
               <div className="text-center text-muted-foreground">
                 Please select a device to view locations
               </div>
             )}
             
-            {selectedDevice && !loading && !error && (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Timestamp</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Address</TableHead>
-                      <TableHead>Accuracy</TableHead>
-                      <TableHead>Speed</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Battery</TableHead>
-                      <TableHead>Network</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {locations.map((location) => (
-                      <TableRow key={location._id}>
-                        <TableCell>{new Date(location.timestamp).toLocaleString()}</TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div>Lat: {location.latitude.toFixed(6)}</div>
-                            <div>Lng: {location.longitude.toFixed(6)}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{location.address}</TableCell>
-                        <TableCell>{location.accuracy}m</TableCell>
-                        <TableCell>{location.speed} m/s</TableCell>
-                        <TableCell>
-                          <Badge variant={location.isMoving ? "default" : "secondary"}>
-                            {location.isMoving ? "Moving" : "Stationary"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={location.batteryLevel > 20 ? "default" : "destructive"}
-                          >
-                            {location.batteryLevel}%
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{location.networkType}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+            {selectedDevice && !loading && !deviceLoading && !error && !deviceError && (
+              <DataTable
+                data={locations}
+                columns={locationsColumns}
+                emptyMessage="No locations found"
+              />
             )}
           </main>
         </SidebarInset>

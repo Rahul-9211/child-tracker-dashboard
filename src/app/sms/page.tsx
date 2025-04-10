@@ -16,24 +16,11 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { auth } from "@/lib/auth-utils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { DeviceSelector } from "@/components/shared/device-selector";
+import { DataTable } from "@/components/shared/data-table";
+import { fetchWithAuth } from "@/lib/api-utils";
+import { useDevice } from "@/hooks/use-device";
 
 interface SMSMetadata {
   contactName: string;
@@ -66,109 +53,114 @@ interface SMSResponse {
   };
 }
 
-interface Device {
-  _id: string;
-  deviceId: string;
-  deviceName: string;
-}
+const smsColumns = [
+  {
+    key: 'contact',
+    header: 'Contact',
+    render: (record: SMSRecord) => (
+      <div className="flex flex-col">
+        <span className="font-medium">{record.metadata.contactName}</span>
+        <span className="text-xs text-muted-foreground">
+          {record.type === 'incoming' ? record.sender : record.receiver}
+        </span>
+      </div>
+    )
+  },
+  {
+    key: 'type',
+    header: 'Type',
+    render: (record: SMSRecord) => (
+      <span className={`px-2 py-1 rounded-full text-xs ${
+        record.type === 'incoming' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+      }`}>
+        {record.type}
+      </span>
+    )
+  },
+  {
+    key: 'message',
+    header: 'Message',
+    render: (record: SMSRecord) => record.message
+  },
+  {
+    key: 'timestamp',
+    header: 'Time',
+    render: (record: SMSRecord) => new Date(record.timestamp).toLocaleString()
+  },
+  {
+    key: 'status',
+    header: 'Status',
+    render: (record: SMSRecord) => (
+      <span className={`px-2 py-1 rounded-full text-xs ${
+        record.status === 'delivered' ? 'bg-green-100 text-green-800' :
+        record.status === 'failed' ? 'bg-red-100 text-red-800' :
+        'bg-gray-100 text-gray-800'
+      }`}>
+        {record.status}
+      </span>
+    )
+  },
+  {
+    key: 'category',
+    header: 'Category',
+    render: (record: SMSRecord) => (
+      <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+        {record.metadata.category}
+      </span>
+    )
+  },
+  {
+    key: 'spam',
+    header: 'Spam',
+    render: (record: SMSRecord) => (
+      <span className={`px-2 py-1 rounded-full text-xs ${
+        record.metadata.isSpam ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+      }`}>
+        {record.metadata.isSpam ? 'Yes' : 'No'}
+      </span>
+    )
+  },
+  {
+    key: 'blocked',
+    header: 'Blocked',
+    render: (record: SMSRecord) => (
+      <span className={`px-2 py-1 rounded-full text-xs ${
+        record.isBlocked ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+      }`}>
+        {record.isBlocked ? 'Yes' : 'No'}
+      </span>
+    )
+  }
+];
 
 export default function SMS() {
   const [smsRecords, setSmsRecords] = useState<SMSRecord[]>([]);
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchDevices = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.log('No token found, logging out');
-          auth.logout();
-          return;
-        }
-
-        console.log('Fetching devices...');
-        const response = await fetch('https://child-tracker-server.onrender.com/api/devices', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          console.error('Failed to fetch devices:', response.status, response.statusText);
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error(`Failed to fetch devices: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('Devices fetched:', data);
-        setDevices(data);
-        
-        // If there's a device in localStorage, use it
-        const storedDeviceId = localStorage.getItem('deviceId');
-        if (storedDeviceId) {
-          console.log('Using stored device ID:', storedDeviceId);
-          setSelectedDevice(storedDeviceId);
-        } else if (data.length > 0) {
-          // Otherwise, select the first device
-          console.log('Selecting first device:', data[0].deviceId);
-          setSelectedDevice(data[0].deviceId);
-          localStorage.setItem('deviceId', data[0].deviceId);
-        }
-      } catch (err) {
-        console.error('Error fetching devices:', err);
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      }
-    };
-
-    fetchDevices();
-  }, []);
+  
+  const { selectedDevice, setSelectedDevice, loading: deviceLoading, error: deviceError } = useDevice();
 
   useEffect(() => {
     if (!selectedDevice) {
-      console.log('No device selected, skipping SMS fetch');
+      setLoading(false);
       return;
     }
 
     const fetchSMS = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.log('No token found, logging out');
-          auth.logout();
+        setLoading(true);
+        const { data, error } = await fetchWithAuth<SMSResponse>(`sms/device/${selectedDevice}`);
+        
+        if (error) {
+          setError(error);
           return;
         }
 
-        console.log('Fetching SMS for device:', selectedDevice);
-        setLoading(true);
-        const response = await fetch(`https://child-tracker-server.onrender.com/api/sms/device/${selectedDevice}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (!response.ok) {
-          console.error('Failed to fetch SMS:', response.status, response.statusText);
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error(`Failed to fetch SMS: ${response.status} ${response.statusText}`);
-        }
-        
-        const data: SMSResponse = await response.json();
-        console.log('SMS data fetched:', data);
-        setSmsRecords(data.smsRecords);
-        setPagination(data.pagination);
+        setSmsRecords(data.smsRecords || []);
+        setPagination(data.pagination || { total: 0, page: 1, pages: 1 });
         setError(null);
       } catch (err) {
-        console.error('Error fetching SMS:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
@@ -177,11 +169,6 @@ export default function SMS() {
 
     fetchSMS();
   }, [selectedDevice]);
-
-  const handleDeviceChange = (deviceId: string) => {
-    setSelectedDevice(deviceId);
-    localStorage.setItem('deviceId', deviceId);
-  };
 
   return (
     <ProtectedRoute allowedRoles={["user", "admin"]}>
@@ -207,93 +194,26 @@ export default function SMS() {
           </header>
 
           <main className="p-6">
-            <div className="mb-4">
-              <Select value={selectedDevice} onValueChange={handleDeviceChange}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select a device" />
-                </SelectTrigger>
-                <SelectContent>
-                  {devices.map((device) => (
-                    <SelectItem key={device._id} value={device.deviceId}>
-                      {device.deviceId}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <DeviceSelector 
+              selectedDevice={selectedDevice} 
+              onDeviceChange={setSelectedDevice} 
+            />
 
-            {loading && <div>Loading SMS records...</div>}
-            {error && <div className="text-red-500">Error: {error}</div>}
+            {(loading || deviceLoading) && <div>Loading SMS records...</div>}
+            {(error || deviceError) && <div className="text-red-500">Error: {error || deviceError}</div>}
             
-            {!selectedDevice && !loading && (
+            {!selectedDevice && !loading && !deviceLoading && (
               <div className="text-center text-muted-foreground">
                 Please select a device to view SMS records
               </div>
             )}
             
-            {selectedDevice && !loading && !error && (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Message</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Spam</TableHead>
-                      <TableHead>Blocked</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {smsRecords.map((record) => (
-                      <TableRow key={record._id}>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{record.metadata.contactName}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {record.type === 'incoming' ? record.sender : record.receiver}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={record.type === 'incoming' ? 'default' : 'secondary'}>
-                            {record.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{record.message}</TableCell>
-                        <TableCell>{new Date(record.timestamp).toLocaleString()}</TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={
-                              record.status === 'delivered' ? 'default' : 
-                              record.status === 'failed' ? 'destructive' : 'secondary'
-                            }
-                          >
-                            {record.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {record.metadata.category}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={record.metadata.isSpam ? 'destructive' : 'secondary'}>
-                            {record.metadata.isSpam ? 'Yes' : 'No'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={record.isBlocked ? 'destructive' : 'secondary'}>
-                            {record.isBlocked ? 'Yes' : 'No'}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+            {selectedDevice && !loading && !deviceLoading && !error && !deviceError && (
+              <DataTable
+                data={smsRecords}
+                columns={smsColumns}
+                emptyMessage="No SMS records found"
+              />
             )}
           </main>
         </SidebarInset>
