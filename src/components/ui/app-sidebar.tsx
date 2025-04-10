@@ -52,8 +52,8 @@ const data = {
       icon: Map,
     },
     {
-      title: "Processes",
-      url: "/processes",
+      title: "Process Activities",
+      url: "/process-activities",
       icon: Activity,
     },
     {
