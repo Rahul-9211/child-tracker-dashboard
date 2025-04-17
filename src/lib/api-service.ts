@@ -80,6 +80,40 @@ interface Notification {
   __v: number;
 }
 
+interface SMSMetadata {
+  contactName: string;
+  isSpam: boolean;
+  category: string;
+}
+
+interface SMSRecord {
+  metadata: SMSMetadata;
+  _id: string;
+  deviceId: string;
+  messageId: string;
+  sender: string;
+  receiver: string;
+  message: string;
+  type: string;
+  status: string;
+  isBlocked: boolean;
+  timestamp: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
+interface SMSPagination {
+  total: number;
+  page: number;
+  pages: number;
+}
+
+interface SMSResponse {
+  smsRecords: SMSRecord[];
+  pagination: SMSPagination;
+}
+
 class ApiService {
   private async request<T>(endpoint: string): Promise<{ data: T; error?: string }> {
     try {
@@ -162,6 +196,15 @@ class ApiService {
   // Notifications
   async getNotifications(deviceId: string): Promise<Notification[]> {
     const response = await this.request<Notification[]>(`/notifications/device/${deviceId}/unread`)
+    if (response.error) {
+      throw new Error(response.error)
+    }
+    return response.data
+  }
+
+  // SMS
+  async getSMS(deviceId: string): Promise<SMSResponse> {
+    const response = await this.request<SMSResponse>(`/sms/device/${deviceId}`)
     if (response.error) {
       throw new Error(response.error)
     }
