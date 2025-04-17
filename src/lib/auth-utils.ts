@@ -6,11 +6,14 @@ interface User {
   allowedDevices: string[];
   createdAt: string;
   updatedAt: string;
+  avatar?: string;
 }
+
+const isBrowser = typeof window !== 'undefined';
 
 export const auth = {
   isAuthenticated(): boolean {
-    if (typeof window === 'undefined') return false;
+    if (!isBrowser) return false;
     
     const token = localStorage.getItem('token');
     const user = localStorage.getItem('user');
@@ -19,7 +22,7 @@ export const auth = {
   },
 
   getUser(): User | null {
-    if (typeof window === 'undefined') return null;
+    if (!isBrowser) return null;
     
     const userStr = localStorage.getItem('user');
     if (!userStr) return null;
@@ -39,7 +42,7 @@ export const auth = {
   },
 
   logout() {
-    if (typeof window === 'undefined') return;
+    if (!isBrowser) return;
     
     // Clear all authentication data
     localStorage.removeItem('token');

@@ -94,7 +94,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       setUserData({
         name: user.name,
         email: user.email,
-        avatar: "/avatars/default.jpg",
+        avatar: user.avatar || "/avatars/default.jpg",
       });
     }
   }, []);
