@@ -22,81 +22,83 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { auth } from "@/lib/auth-utils"
 
-const data = {
-  user: {
-    name: "Admin",
-    email: "admin@example.com",
-    avatar: "/avatars/default.jpg",
+const navMain = [
+  {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: Home,
+    isActive: true,
   },
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: Home,
-      isActive: true,
-    },
-    {
-      title: "Device Info",
-      url: "/device-info",
-      icon: Smartphone,
-    },
-    {
-      title: "Contacts",
-      url: "/contacts",
-      icon: Users,
-    },
-    {
-      title: "Locations",
-      url: "/locations",
-      icon: Map,
-    },
-    {
-      title: "Processes",
-      url: "/processes",
-      icon: Activity,
-    },
-    {
-      title: "Applications",
-      url: "/applications",
-      icon: Smartphone,
-    },
-    {
-      title: "Notifications",
-      url: "/notifications",
-      icon: Bell,
-    },
-    {
-      title: "SMS",
-      url: "/sms",
-      icon: MessageSquare,
-    },
-    {
-      title: "Calls",
-      url: "/calls",
-      icon: Phone,
-    },
-    {
-      title: "Settings",
-      url: "/settings",
-      icon: Settings2,
-    },
-  ],
-}
+  {
+    title: "Device Info",
+    url: "/device-info",
+    icon: Smartphone,
+  },
+  {
+    title: "Contacts",
+    url: "/contacts",
+    icon: Users,
+  },
+  {
+    title: "Locations",
+    url: "/locations",
+    icon: Map,
+  },
+  {
+    title: "Processes",
+    url: "/process-activities",
+    icon: Activity,
+  },
+  {
+    title: "Applications",
+    url: "/applications",
+    icon: Smartphone,
+  },
+  {
+    title: "Notifications",
+    url: "/notifications",
+    icon: Bell,
+  },
+  {
+    title: "SMS",
+    url: "/sms",
+    icon: MessageSquare,
+  },
+  {
+    title: "Calls",
+    url: "/calls",
+    icon: Phone,
+  },
+  {
+    title: "Settings",
+    url: "/settings",
+    icon: Settings2,
+  },
+]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const user = auth.getUser()
+
+  const userData = {
+    name: user?.name || "User",
+    email: user?.email || "user@example.com",
+    avatar: "/avatars/default.jpg",
+  }
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <div className="flex items-center justify-center p-4">
-          <h1 className="text-xl font-bold">Child Tracker</h1>
+        <div className="flex items-center justify-center md:justify-start p-4">
+          <h1 className="text-xl font-bold">PG</h1>
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={userData} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
