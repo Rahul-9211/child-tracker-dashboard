@@ -24,6 +24,18 @@ export default function LoginPage() {
 
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
+      <div className="relative hidden lg:block bg-muted">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Image
+            src="/globe.svg"
+            alt="Security"
+            width={400}
+            height={400}
+            className="opacity-20"
+          />
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
+      </div>
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
           <a href="#" className="flex items-center gap-2 font-medium">
@@ -38,16 +50,6 @@ export default function LoginPage() {
             <LoginForm />
           </div>
         </div>
-        <Image 
-          src="/logo.png" 
-          alt="Logo"
-          width={150}
-          height={150}
-          className="mb-8"
-        />
-      </div>
-      <div className="relative hidden bg-muted lg:block">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5" />
       </div>
     </div>
   )

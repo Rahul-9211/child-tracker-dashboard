@@ -35,22 +35,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface Notification {
+interface ProcessActivity {
   _id: string;
   deviceId: string;
-  appPackageName: string;
-  appName: string;
-  title: string;
-  text: string;
-  timestamp: string;
-  category: string;
+  processName: string;
+  packageName: string;
+  startTime: string;
+  cpuUsage: number;
+  memoryUsage: number;
+  isActive: boolean;
   priority: string;
-  isRead: boolean;
-  isCleared: boolean;
-  actions: string[];
-  extras: {
-    [key: string]: string;
-  };
+  userId: number;
+  processId: number;
+  parentProcessId: number;
   createdAt: string;
   updatedAt: string;
   __v: number;
@@ -62,8 +59,8 @@ interface Device {
   deviceName: string;
 }
 
-export default function Notifications() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+export default function ProcessActivities() {
+  const [processes, setProcesses] = useState<ProcessActivity[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -95,11 +92,11 @@ export default function Notifications() {
   useEffect(() => {
     if (!selectedDevice) return;
 
-    const fetchNotifications = async () => {
+    const fetchProcesses = async () => {
       try {
         setLoading(true);
-        const data = await apiService.getNotifications(selectedDevice);
-        setNotifications(data);
+        const data = await apiService.getProcessActivities(selectedDevice);
+        setProcesses(data);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -108,7 +105,7 @@ export default function Notifications() {
       }
     };
 
-    fetchNotifications();
+    fetchProcesses();
   }, [selectedDevice]);
 
   const handleDeviceChange = (deviceId: string) => {
@@ -132,7 +129,7 @@ export default function Notifications() {
                   </BreadcrumbItem>
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
-                    <BreadcrumbPage>Notifications</BreadcrumbPage>
+                    <BreadcrumbPage>Process Activities</BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
@@ -155,12 +152,12 @@ export default function Notifications() {
               </Select>
             </div>
 
-            {loading && <div>Loading notifications...</div>}
+            {loading && <div>Loading process activities...</div>}
             {error && <div className="text-red-500">Error: {error}</div>}
             
             {!selectedDevice && !loading && (
               <div className="text-center text-muted-foreground">
-                Please select a device to view notifications
+                Please select a device to view process activities
               </div>
             )}
             
@@ -169,52 +166,37 @@ export default function Notifications() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>App</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Message</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Category</TableHead>
+                      <TableHead>Process Name</TableHead>
+                      <TableHead>Package Name</TableHead>
+                      <TableHead>Start Time</TableHead>
+                      <TableHead>CPU Usage</TableHead>
+                      <TableHead>Memory Usage</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>Process ID</TableHead>
+                      <TableHead>Parent Process ID</TableHead>
+                      <TableHead>User ID</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {notifications.map((notification) => (
-                      <TableRow key={notification._id}>
-                        <TableCell className="font-medium">{notification.appName}</TableCell>
-                        <TableCell>{notification.title}</TableCell>
-                        <TableCell>{notification.text}</TableCell>
-                        <TableCell>{new Date(notification.timestamp).toLocaleString()}</TableCell>
+                    {processes.map((process) => (
+                      <TableRow key={process._id}>
+                        <TableCell className="font-medium">{process.processName}</TableCell>
+                        <TableCell>{process.packageName}</TableCell>
+                        <TableCell>{new Date(process.startTime).toLocaleString()}</TableCell>
+                        <TableCell>{process.cpuUsage.toFixed(2)}%</TableCell>
+                        <TableCell>{process.memoryUsage} MB</TableCell>
                         <TableCell>
-                          <Badge variant="secondary">
-                            {notification.category}
+                          <Badge variant="secondary">{process.priority}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={process.isActive ? "default" : "destructive"}>
+                            {process.isActive ? "Active" : "Inactive"}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <Badge variant={notification.priority === 'high' ? 'destructive' : 'default'}>
-                            {notification.priority}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <Badge variant={notification.isRead ? "secondary" : "default"}>
-                              {notification.isRead ? "Read" : "Unread"}
-                            </Badge>
-                            <Badge variant={notification.isCleared ? "secondary" : "default"}>
-                              {notification.isCleared ? "Cleared" : "Active"}
-                            </Badge>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {notification.actions.map((action, index) => (
-                              <Badge key={index} variant="outline">
-                                {action}
-                              </Badge>
-                            ))}
-                          </div>
-                        </TableCell>
+                        <TableCell>{process.processId}</TableCell>
+                        <TableCell>{process.parentProcessId}</TableCell>
+                        <TableCell>{process.userId}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

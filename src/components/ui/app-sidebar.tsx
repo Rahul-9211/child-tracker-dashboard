@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useEffect, useState } from "react"
 import {
   Phone,
   MessageSquare,
@@ -22,81 +23,101 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { auth } from "@/lib/auth-utils"
 
-const data = {
-  user: {
-    name: "Admin",
-    email: "admin@example.com",
-    avatar: "/avatars/default.jpg",
+const navMain = [
+  {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: Home,
+    isActive: true,
   },
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: Home,
-      isActive: true,
-    },
-    {
-      title: "Device Info",
-      url: "/device-info",
-      icon: Smartphone,
-    },
-    {
-      title: "Contacts",
-      url: "/contacts",
-      icon: Users,
-    },
-    {
-      title: "Locations",
-      url: "/locations",
-      icon: Map,
-    },
-    {
-      title: "Processes",
-      url: "/processes",
-      icon: Activity,
-    },
-    {
-      title: "Applications",
-      url: "/applications",
-      icon: Smartphone,
-    },
-    {
-      title: "Notifications",
-      url: "/notifications",
-      icon: Bell,
-    },
-    {
-      title: "SMS",
-      url: "/sms",
-      icon: MessageSquare,
-    },
-    {
-      title: "Calls",
-      url: "/calls",
-      icon: Phone,
-    },
-    {
-      title: "Settings",
-      url: "/settings",
-      icon: Settings2,
-    },
-  ],
-}
+  {
+    title: "Device Info",
+    url: "/device-info",
+    icon: Smartphone,
+  },
+  {
+    title: "Contacts",
+    url: "/contacts",
+    icon: Users,
+  },
+  {
+    title: "Locations",
+    url: "/locations",
+    icon: Map,
+  },
+  {
+    title: "Processes",
+    url: "/process-activities",
+    icon: Activity,
+  },
+  {
+    title: "Applications",
+    url: "/applications",
+    icon: Smartphone,
+  },
+  {
+    title: "Notifications",
+    url: "/notifications",
+    icon: Bell,
+  },
+  {
+    title: "SMS",
+    url: "/sms",
+    icon: MessageSquare,
+  },
+  {
+    title: "Calls",
+    url: "/calls",
+    icon: Phone,
+  },
+  {
+    title: "Settings",
+    url: "/settings",
+    icon: Settings2,
+  },
+]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const [mounted, setMounted] = useState(false);
+  const [userData, setUserData] = useState({
+    name: "User",
+    email: "user@example.com",
+    avatar: "/avatars/default.jpg",
+  });
+
+  useEffect(() => {
+    setMounted(true);
+    const user = auth.getUser();
+    if (user) {
+      setUserData({
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar || "/avatars/default.jpg",
+      });
+    }
+  }, []);
+
+  // Don't render user data until after hydration
+  const displayUserData = mounted ? userData : {
+    name: "User",
+    email: "user@example.com",
+    avatar: "/avatars/default.jpg",
+  };
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <div className="flex items-center justify-center p-4">
-          <h1 className="text-xl font-bold">Child Tracker</h1>
+        <div className="flex items-center justify-center md:justify-start p-4">
+          <h1 className="text-xl font-bold">PG</h1>
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={displayUserData} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
