@@ -114,6 +114,48 @@ interface SMSResponse {
   pagination: SMSPagination;
 }
 
+interface CallLocation {
+  latitude: number;
+  longitude: number;
+  address: string;
+}
+
+interface CallMetadata {
+  location: CallLocation;
+  contactName: string;
+  isSpam: boolean;
+  category: string;
+  recordingUrl: string;
+}
+
+interface CallRecord {
+  metadata: CallMetadata;
+  _id: string;
+  deviceId: string;
+  callId: string;
+  caller: string;
+  receiver: string;
+  duration: number;
+  type: string;
+  status: string;
+  isBlocked: boolean;
+  timestamp: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
+interface CallPagination {
+  total: number;
+  page: number;
+  pages: number;
+}
+
+interface CallResponse {
+  callRecords: CallRecord[];
+  pagination: CallPagination;
+}
+
 class ApiService {
   private async request<T>(endpoint: string): Promise<{ data: T; error?: string }> {
     try {
@@ -205,6 +247,15 @@ class ApiService {
   // SMS
   async getSMS(deviceId: string): Promise<SMSResponse> {
     const response = await this.request<SMSResponse>(`/sms/device/${deviceId}`)
+    if (response.error) {
+      throw new Error(response.error)
+    }
+    return response.data
+  }
+
+  // Calls
+  async getCalls(deviceId: string): Promise<CallResponse> {
+    const response = await this.request<CallResponse>(`/calls/device/${deviceId}`)
     if (response.error) {
       throw new Error(response.error)
     }

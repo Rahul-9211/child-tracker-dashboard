@@ -26,78 +26,123 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { auth } from "@/lib/auth-utils";
-import { useRouter } from "next/navigation";
+import { apiService } from "@/lib/api-service";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-interface Call {
+interface CallLocation {
+  latitude: number;
+  longitude: number;
+  address: string;
+}
+
+interface CallMetadata {
+  location: CallLocation;
+  contactName: string;
+  isSpam: boolean;
+  category: string;
+  recordingUrl: string;
+}
+
+interface CallRecord {
+  metadata: CallMetadata;
   _id: string;
   deviceId: string;
-  type: string;
-  number: string;
+  callId: string;
+  caller: string;
+  receiver: string;
   duration: number;
-  timestamp: string;
-  contactName: string;
-  isRead: boolean;
+  type: string;
+  status: string;
   isBlocked: boolean;
-  simSlot: number;
+  timestamp: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
+interface CallPagination {
+  total: number;
+  page: number;
+  pages: number;
+}
+
+interface CallResponse {
+  callRecords: CallRecord[];
+  pagination: CallPagination;
+}
+
+interface Device {
+  _id: string;
+  deviceId: string;
+  deviceName: string;
 }
 
 export default function Calls() {
-  const [calls, setCalls] = useState<Call[]>([]);
+  const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
+  const [pagination, setPagination] = useState<CallPagination>({ total: 0, page: 1, pages: 1 });
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
-    const fetchCalls = async () => {
+    const fetchDevices = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          auth.logout();
-          return;
-        }
-
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/calls/device/${localStorage.getItem('deviceId')}/history`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const data = await apiService.getDevices();
+        setDevices(data);
         
-        if (!response.ok) {
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error('Failed to fetch call history');
+        // If there's a device in localStorage, use it
+        const storedDeviceId = localStorage.getItem('deviceId');
+        if (storedDeviceId) {
+          setSelectedDevice(storedDeviceId);
+        } else if (data.length > 0) {
+          // Otherwise, select the first device
+          setSelectedDevice(data[0].deviceId);
+          localStorage.setItem('deviceId', data[0].deviceId);
         }
-        
-        const data = await response.json();
-        setCalls(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
-        if (err instanceof Error && err.message.includes('unauthorized')) {
-          auth.logout();
-        }
+      }
+    };
+
+    fetchDevices();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDevice) return;
+
+    const fetchCalls = async () => {
+      try {
+        setLoading(true);
+        const data = await apiService.getCalls(selectedDevice);
+        setCallRecords(data.callRecords);
+        setPagination(data.pagination);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
     };
 
     fetchCalls();
-  }, [router]);
+  }, [selectedDevice]);
+
+  const handleDeviceChange = (deviceId: string) => {
+    setSelectedDevice(deviceId);
+    localStorage.setItem('deviceId', deviceId);
+  };
 
   const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+    const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${remainingSeconds}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${remainingSeconds}s`;
-    } else {
-      return `${remainingSeconds}s`;
-    }
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -124,55 +169,86 @@ export default function Calls() {
           </header>
 
           <main className="p-6">
-            {loading && <div>Loading call history...</div>}
+            <div className="mb-4">
+              <Select value={selectedDevice} onValueChange={handleDeviceChange}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select a device" />
+                </SelectTrigger>
+                <SelectContent>
+                  {devices.map((device) => (
+                    <SelectItem key={device._id} value={device.deviceId}>
+                      {device.deviceId}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {loading && <div>Loading call records...</div>}
             {error && <div className="text-red-500">Error: {error}</div>}
             
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Number</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>SIM Slot</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {calls.map((call) => (
-                    <TableRow key={call._id}>
-                      <TableCell>
-                        <Badge 
-                          variant={
-                            call.type === 'outgoing' ? 'default' : 
-                            call.type === 'incoming' ? 'secondary' : 'destructive'
-                          }
-                        >
-                          {call.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{call.contactName || 'Unknown'}</TableCell>
-                      <TableCell>{call.number}</TableCell>
-                      <TableCell>{new Date(call.timestamp).toLocaleString()}</TableCell>
-                      <TableCell>{formatDuration(call.duration)}</TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <Badge variant={call.isRead ? "secondary" : "default"}>
-                            {call.isRead ? "Read" : "Unread"}
-                          </Badge>
-                          {call.isBlocked && (
-                            <Badge variant="destructive">Blocked</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>SIM {call.simSlot + 1}</TableCell>
+            {!selectedDevice && !loading && (
+              <div className="text-center text-muted-foreground">
+                Please select a device to view call records
+              </div>
+            )}
+            
+            {selectedDevice && !loading && !error && (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Contact</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Spam</TableHead>
+                      <TableHead>Blocked</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {callRecords.map((call) => (
+                      <TableRow key={call._id}>
+                        <TableCell className="font-medium">
+                          {call.metadata?.contactName || (call.type === 'incoming' ? call.caller : call.receiver)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={call.type === 'incoming' ? 'default' : 'secondary'}>
+                            {call.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{formatDuration(call.duration)}</TableCell>
+                        <TableCell>{new Date(call.timestamp).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {call.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{call.metadata?.location?.address || 'N/A'}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {call.metadata?.category || 'N/A'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={call.metadata?.isSpam ? "destructive" : "default"}>
+                            {call.metadata?.isSpam ? "Yes" : "No"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={call.isBlocked ? "destructive" : "default"}>
+                            {call.isBlocked ? "Yes" : "No"}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </main>
         </SidebarInset>
       </SidebarProvider>
