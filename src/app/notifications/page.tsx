@@ -26,14 +26,14 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { auth } from "@/lib/auth-utils";
-import { useRouter } from "next/navigation";
-
-interface NotificationExtras {
-  sender?: string;
-  messageId?: string;
-  [key: string]: string | undefined;
-}
+import { apiService } from "@/lib/api-service";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Notification {
   _id: string;
@@ -48,52 +48,73 @@ interface Notification {
   isRead: boolean;
   isCleared: boolean;
   actions: string[];
-  extras: NotificationExtras;
+  extras: {
+    [key: string]: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
+interface Device {
+  _id: string;
+  deviceId: string;
+  deviceName: string;
 }
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
-    const fetchNotifications = async () => {
+    const fetchDevices = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          auth.logout();
-          return;
-        }
-
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/device/${localStorage.getItem('deviceId')}/unread`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const data = await apiService.getDevices();
+        setDevices(data);
         
-        if (!response.ok) {
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error('Failed to fetch notifications');
+        // If there's a device in localStorage, use it
+        const storedDeviceId = localStorage.getItem('deviceId');
+        if (storedDeviceId) {
+          setSelectedDevice(storedDeviceId);
+        } else if (data.length > 0) {
+          // Otherwise, select the first device
+          setSelectedDevice(data[0].deviceId);
+          localStorage.setItem('deviceId', data[0].deviceId);
         }
-        
-        const data = await response.json();
-        setNotifications(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
-        if (err instanceof Error && err.message.includes('unauthorized')) {
-          auth.logout();
-        }
+      }
+    };
+
+    fetchDevices();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDevice) return;
+
+    const fetchNotifications = async () => {
+      try {
+        setLoading(true);
+        const data = await apiService.getNotifications(selectedDevice);
+        setNotifications(data);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
     };
 
     fetchNotifications();
-  }, [router]);
+  }, [selectedDevice]);
+
+  const handleDeviceChange = (deviceId: string) => {
+    setSelectedDevice(deviceId);
+    localStorage.setItem('deviceId', deviceId);
+  };
 
   return (
     <ProtectedRoute allowedRoles={["user", "admin"]}>
@@ -119,69 +140,87 @@ export default function Notifications() {
           </header>
 
           <main className="p-6">
+            <div className="mb-4">
+              <Select value={selectedDevice} onValueChange={handleDeviceChange}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select a device" />
+                </SelectTrigger>
+                <SelectContent>
+                  {devices.map((device) => (
+                    <SelectItem key={device._id} value={device.deviceId}>
+                      {device.deviceId}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {loading && <div>Loading notifications...</div>}
             {error && <div className="text-red-500">Error: {error}</div>}
             
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>App</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Message</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {notifications.map((notification) => (
-                    <TableRow key={notification._id}>
-                      <TableCell className="font-medium">{notification.appName}</TableCell>
-                      <TableCell>{notification.title}</TableCell>
-                      <TableCell>{notification.text}</TableCell>
-                      <TableCell>{new Date(notification.timestamp).toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {notification.category}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={
-                            notification.priority === 'high' ? 'destructive' : 
-                            notification.priority === 'medium' ? 'default' : 'secondary'
-                          }
-                        >
-                          {notification.priority}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <Badge variant={notification.isRead ? "secondary" : "default"}>
-                            {notification.isRead ? "Read" : "Unread"}
-                          </Badge>
-                          <Badge variant={notification.isCleared ? "secondary" : "default"}>
-                            {notification.isCleared ? "Cleared" : "Active"}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {notification.actions.map((action, index) => (
-                            <Badge key={index} variant="outline">
-                              {action}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
+            {!selectedDevice && !loading && (
+              <div className="text-center text-muted-foreground">
+                Please select a device to view notifications
+              </div>
+            )}
+            
+            {selectedDevice && !loading && !error && (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>App</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {notifications.map((notification) => (
+                      <TableRow key={notification._id}>
+                        <TableCell className="font-medium">{notification.appName}</TableCell>
+                        <TableCell>{notification.title}</TableCell>
+                        <TableCell>{notification.text}</TableCell>
+                        <TableCell>{new Date(notification.timestamp).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {notification.category}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={notification.priority === 'high' ? 'destructive' : 'default'}>
+                            {notification.priority}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <Badge variant={notification.isRead ? "secondary" : "default"}>
+                              {notification.isRead ? "Read" : "Unread"}
+                            </Badge>
+                            <Badge variant={notification.isCleared ? "secondary" : "default"}>
+                              {notification.isCleared ? "Cleared" : "Active"}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {notification.actions.map((action, index) => (
+                              <Badge key={index} variant="outline">
+                                {action}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </main>
         </SidebarInset>
       </SidebarProvider>

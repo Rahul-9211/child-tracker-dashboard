@@ -59,6 +59,27 @@ interface Application {
   __v: number;
 }
 
+interface Notification {
+  _id: string;
+  deviceId: string;
+  appPackageName: string;
+  appName: string;
+  title: string;
+  text: string;
+  timestamp: string;
+  category: string;
+  priority: string;
+  isRead: boolean;
+  isCleared: boolean;
+  actions: string[];
+  extras: {
+    [key: string]: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
 class ApiService {
   private async request<T>(endpoint: string): Promise<{ data: T; error?: string }> {
     try {
@@ -132,6 +153,15 @@ class ApiService {
   // Applications
   async getApplications(deviceId: string): Promise<Application[]> {
     const response = await this.request<Application[]>(`/applications/device/${deviceId}/active`)
+    if (response.error) {
+      throw new Error(response.error)
+    }
+    return response.data
+  }
+
+  // Notifications
+  async getNotifications(deviceId: string): Promise<Notification[]> {
+    const response = await this.request<Notification[]>(`/notifications/device/${deviceId}/unread`)
     if (response.error) {
       throw new Error(response.error)
     }
