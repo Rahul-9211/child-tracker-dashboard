@@ -34,6 +34,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface CallLocation {
   latitude: number;
@@ -72,10 +74,10 @@ interface CallPagination {
   pages: number;
 }
 
-interface CallResponse {
-  callRecords: CallRecord[];
-  pagination: CallPagination;
-}
+// interface CallResponse {
+//   callRecords: CallRecord[];
+//   pagination: CallPagination;
+// }
 
 interface Device {
   _id: string;
@@ -97,12 +99,10 @@ export default function Calls() {
         const data = await apiService.getDevices();
         setDevices(data);
         
-        // If there's a device in localStorage, use it
         const storedDeviceId = localStorage.getItem('deviceId');
         if (storedDeviceId) {
           setSelectedDevice(storedDeviceId);
         } else if (data.length > 0) {
-          // Otherwise, select the first device
           setSelectedDevice(data[0].deviceId);
           localStorage.setItem('deviceId', data[0].deviceId);
         }
@@ -120,7 +120,7 @@ export default function Calls() {
     const fetchCalls = async () => {
       try {
         setLoading(true);
-        const data = await apiService.getCalls(selectedDevice);
+        const data = await apiService.getCalls(selectedDevice, pagination.page);
         setCallRecords(data.callRecords);
         setPagination(data.pagination);
         setError(null);
@@ -132,11 +132,17 @@ export default function Calls() {
     };
 
     fetchCalls();
-  }, [selectedDevice]);
+  }, [selectedDevice, pagination.page]);
 
   const handleDeviceChange = (deviceId: string) => {
     setSelectedDevice(deviceId);
     localStorage.setItem('deviceId', deviceId);
+    // Reset pagination when device changes
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
   };
 
   const formatDuration = (seconds: number) => {
@@ -194,59 +200,89 @@ export default function Calls() {
             )}
             
             {selectedDevice && !loading && !error && (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Spam</TableHead>
-                      <TableHead>Blocked</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {callRecords.map((call) => (
-                      <TableRow key={call._id}>
-                        <TableCell className="font-medium">
-                          {call.metadata?.contactName || (call.type === 'incoming' ? call.caller : call.receiver)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={call.type === 'incoming' ? 'default' : 'secondary'}>
-                            {call.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{formatDuration(call.duration)}</TableCell>
-                        <TableCell>{new Date(call.timestamp).toLocaleString()}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {call.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{call.metadata?.location?.address || 'N/A'}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {call.metadata?.category || 'N/A'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={call.metadata?.isSpam ? "destructive" : "default"}>
-                            {call.metadata?.isSpam ? "Yes" : "No"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={call.isBlocked ? "destructive" : "default"}>
-                            {call.isBlocked ? "Yes" : "No"}
-                          </Badge>
-                        </TableCell>
+              <div className="space-y-4">
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Spam</TableHead>
+                        <TableHead>Blocked</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {callRecords.map((call) => (
+                        <TableRow key={call._id}>
+                          <TableCell className="font-medium">
+                            {call.metadata?.contactName || (call.type === 'incoming' ? call.caller : call.receiver)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={call.type === 'incoming' ? 'default' : 'secondary'}>
+                              {call.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{formatDuration(call.duration)}</TableCell>
+                          <TableCell>{new Date(call.timestamp).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {call.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{call.metadata?.location?.address || 'N/A'}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {call.metadata?.category || 'N/A'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={call.metadata?.isSpam ? "destructive" : "default"}>
+                              {call.metadata?.isSpam ? "Yes" : "No"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={call.isBlocked ? "destructive" : "default"}>
+                              {call.isBlocked ? "Yes" : "No"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {callRecords.length} of {pagination.total} records
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(pagination.page - 1)}
+                      disabled={pagination.page === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="text-sm">
+                      Page {pagination.page} of {pagination.pages}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(pagination.page + 1)}
+                      disabled={pagination.page === pagination.pages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
           </main>

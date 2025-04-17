@@ -34,6 +34,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface SMSMetadata {
   contactName: string;
@@ -64,10 +66,10 @@ interface SMSPagination {
   pages: number;
 }
 
-interface SMSResponse {
-  smsRecords: SMSRecord[];
-  pagination: SMSPagination;
-}
+// interface SMSResponse {
+//   smsRecords: SMSRecord[];
+//   pagination: SMSPagination;
+// }
 
 interface Device {
   _id: string;
@@ -106,13 +108,24 @@ export default function SMS() {
     fetchDevices();
   }, []);
 
+  const handleDeviceChange = (deviceId: string) => {
+    setSelectedDevice(deviceId);
+    localStorage.setItem('deviceId', deviceId);
+    // Reset pagination when device changes
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+  };
+
   useEffect(() => {
     if (!selectedDevice) return;
 
     const fetchSMS = async () => {
       try {
         setLoading(true);
-        const data = await apiService.getSMS(selectedDevice);
+        const data = await apiService.getSMS(selectedDevice, pagination.page);
         setSMSRecords(data.smsRecords);
         setPagination(data.pagination);
         setError(null);
@@ -124,12 +137,7 @@ export default function SMS() {
     };
 
     fetchSMS();
-  }, [selectedDevice]);
-
-  const handleDeviceChange = (deviceId: string) => {
-    setSelectedDevice(deviceId);
-    localStorage.setItem('deviceId', deviceId);
-  };
+  }, [selectedDevice, pagination.page]);
 
   return (
     <ProtectedRoute allowedRoles={["user", "admin"]}>
@@ -180,57 +188,87 @@ export default function SMS() {
             )}
             
             {selectedDevice && !loading && !error && (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Message</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Spam</TableHead>
-                      <TableHead>Blocked</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {smsRecords.map((sms) => (
-                      <TableRow key={sms._id}>
-                        <TableCell className="font-medium">
-                          {sms.metadata.contactName || (sms.type === 'incoming' ? sms.sender : sms.receiver)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={sms.type === 'incoming' ? 'default' : 'secondary'}>
-                            {sms.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{sms.message}</TableCell>
-                        <TableCell>{new Date(sms.timestamp).toLocaleString()}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {sms.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {sms.metadata.category}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={sms.metadata.isSpam ? "destructive" : "default"}>
-                            {sms.metadata.isSpam ? "Yes" : "No"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={sms.isBlocked ? "destructive" : "default"}>
-                            {sms.isBlocked ? "Yes" : "No"}
-                          </Badge>
-                        </TableCell>
+              <div className="space-y-4">
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Message</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Spam</TableHead>
+                        <TableHead>Blocked</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {smsRecords.map((sms) => (
+                        <TableRow key={sms._id}>
+                          <TableCell className="font-medium">
+                            {sms.metadata.contactName || (sms.type === 'incoming' ? sms.sender : sms.receiver)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={sms.type === 'incoming' ? 'default' : 'secondary'}>
+                              {sms.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{sms.message}</TableCell>
+                          <TableCell>{new Date(sms.timestamp).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {sms.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {sms.metadata.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={sms.metadata.isSpam ? "destructive" : "default"}>
+                              {sms.metadata.isSpam ? "Yes" : "No"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={sms.isBlocked ? "destructive" : "default"}>
+                              {sms.isBlocked ? "Yes" : "No"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {smsRecords.length} of {pagination.total} records
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(pagination.page - 1)}
+                      disabled={pagination.page === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="text-sm">
+                      Page {pagination.page} of {pagination.pages}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(pagination.page + 1)}
+                      disabled={pagination.page === pagination.pages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
           </main>

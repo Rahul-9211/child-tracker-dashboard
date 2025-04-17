@@ -245,8 +245,8 @@ class ApiService {
   }
 
   // SMS
-  async getSMS(deviceId: string): Promise<SMSResponse> {
-    const response = await this.request<SMSResponse>(`/sms/device/${deviceId}`)
+  async getSMS(deviceId: string, page: number = 1): Promise<SMSResponse> {
+    const response = await this.request<SMSResponse>(`/sms/device/${deviceId}?page=${page}`)
     if (response.error) {
       throw new Error(response.error)
     }
@@ -254,8 +254,8 @@ class ApiService {
   }
 
   // Calls
-  async getCalls(deviceId: string): Promise<CallResponse> {
-    const response = await this.request<CallResponse>(`/calls/device/${deviceId}`)
+  async getCalls(deviceId: string, page: number = 1): Promise<CallResponse> {
+    const response = await this.request<CallResponse>(`/calls/device/${deviceId}?page=${page}`)
     if (response.error) {
       throw new Error(response.error)
     }
