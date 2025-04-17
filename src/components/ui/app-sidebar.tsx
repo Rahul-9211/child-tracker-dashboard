@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useEffect, useState } from "react"
 import {
   Phone,
   MessageSquare,
@@ -79,13 +80,31 @@ const navMain = [
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const user = auth.getUser()
-
-  const userData = {
-    name: user?.name || "User",
-    email: user?.email || "user@example.com",
+  const [mounted, setMounted] = useState(false);
+  const [userData, setUserData] = useState({
+    name: "User",
+    email: "user@example.com",
     avatar: "/avatars/default.jpg",
-  }
+  });
+
+  useEffect(() => {
+    setMounted(true);
+    const user = auth.getUser();
+    if (user) {
+      setUserData({
+        name: user.name,
+        email: user.email,
+        avatar: "/avatars/default.jpg",
+      });
+    }
+  }, []);
+
+  // Don't render user data until after hydration
+  const displayUserData = mounted ? userData : {
+    name: "User",
+    email: "user@example.com",
+    avatar: "/avatars/default.jpg",
+  };
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -98,7 +117,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={userData} />
+        <NavUser user={displayUserData} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
