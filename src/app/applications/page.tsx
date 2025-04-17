@@ -26,8 +26,14 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { auth } from "@/lib/auth-utils";
-import { useRouter } from "next/navigation";
+import { apiService } from "@/lib/api-service";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Application {
   _id: string;
@@ -39,51 +45,70 @@ interface Application {
   lastUsed: string;
   usageCount: number;
   category: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
+interface Device {
+  _id: string;
+  deviceId: string;
+  deviceName: string;
 }
 
 export default function Applications() {
   const [applications, setApplications] = useState<Application[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
-    const fetchApplications = async () => {
+    const fetchDevices = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          auth.logout();
-          return;
-        }
-
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/applications/device/${localStorage.getItem('deviceId')}/active`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const data = await apiService.getDevices();
+        setDevices(data);
         
-        if (!response.ok) {
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error('Failed to fetch applications');
+        // If there's a device in localStorage, use it
+        const storedDeviceId = localStorage.getItem('deviceId');
+        if (storedDeviceId) {
+          setSelectedDevice(storedDeviceId);
+        } else if (data.length > 0) {
+          // Otherwise, select the first device
+          setSelectedDevice(data[0].deviceId);
+          localStorage.setItem('deviceId', data[0].deviceId);
         }
-        
-        const data = await response.json();
-        setApplications(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
-        if (err instanceof Error && err.message.includes('unauthorized')) {
-          auth.logout();
-        }
+      }
+    };
+
+    fetchDevices();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDevice) return;
+
+    const fetchApplications = async () => {
+      try {
+        setLoading(true);
+        const data = await apiService.getApplications(selectedDevice);
+        setApplications(data);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
     };
 
     fetchApplications();
-  }, [router]);
+  }, [selectedDevice]);
+
+  const handleDeviceChange = (deviceId: string) => {
+    setSelectedDevice(deviceId);
+    localStorage.setItem('deviceId', deviceId);
+  };
 
   return (
     <ProtectedRoute allowedRoles={["user", "admin"]}>
@@ -109,45 +134,68 @@ export default function Applications() {
           </header>
 
           <main className="p-6">
+            <div className="mb-4">
+              <Select value={selectedDevice} onValueChange={handleDeviceChange}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select a device" />
+                </SelectTrigger>
+                <SelectContent>
+                  {devices.map((device) => (
+                    <SelectItem key={device._id} value={device.deviceId}>
+                      {device.deviceId}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {loading && <div>Loading applications...</div>}
             {error && <div className="text-red-500">Error: {error}</div>}
             
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>App Name</TableHead>
-                    <TableHead>Package Name</TableHead>
-                    <TableHead>Start Time</TableHead>
-                    <TableHead>Last Used</TableHead>
-                    <TableHead>Usage Count</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Category</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {applications.map((app) => (
-                    <TableRow key={app._id}>
-                      <TableCell className="font-medium">{app.appName}</TableCell>
-                      <TableCell>{app.packageName}</TableCell>
-                      <TableCell>{new Date(app.startTime).toLocaleString()}</TableCell>
-                      <TableCell>{new Date(app.lastUsed).toLocaleString()}</TableCell>
-                      <TableCell>{app.usageCount}</TableCell>
-                      <TableCell>
-                        <Badge variant={app.isActive ? "default" : "secondary"}>
-                          {app.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {app.category}
-                        </Badge>
-                      </TableCell>
+            {!selectedDevice && !loading && (
+              <div className="text-center text-muted-foreground">
+                Please select a device to view applications
+              </div>
+            )}
+            
+            {selectedDevice && !loading && !error && (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>App Name</TableHead>
+                      <TableHead>Package Name</TableHead>
+                      <TableHead>Start Time</TableHead>
+                      <TableHead>Last Used</TableHead>
+                      <TableHead>Usage Count</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Category</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {applications.map((app) => (
+                      <TableRow key={app._id}>
+                        <TableCell className="font-medium">{app.appName}</TableCell>
+                        <TableCell>{app.packageName}</TableCell>
+                        <TableCell>{new Date(app.startTime).toLocaleString()}</TableCell>
+                        <TableCell>{new Date(app.lastUsed).toLocaleString()}</TableCell>
+                        <TableCell>{app.usageCount}</TableCell>
+                        <TableCell>
+                          <Badge variant={app.isActive ? "default" : "secondary"}>
+                            {app.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {app.category}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </main>
         </SidebarInset>
       </SidebarProvider>

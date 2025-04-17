@@ -44,6 +44,21 @@ interface Device {
   deviceName: string;
 }
 
+interface Application {
+  _id: string;
+  deviceId: string;
+  packageName: string;
+  appName: string;
+  startTime: string;
+  isActive: boolean;
+  lastUsed: string;
+  usageCount: number;
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
 class ApiService {
   private async request<T>(endpoint: string): Promise<{ data: T; error?: string }> {
     try {
@@ -108,6 +123,15 @@ class ApiService {
   // Devices
   async getDevices(): Promise<Device[]> {
     const response = await this.request<Device[]>(`/devices`)
+    if (response.error) {
+      throw new Error(response.error)
+    }
+    return response.data
+  }
+
+  // Applications
+  async getApplications(deviceId: string): Promise<Application[]> {
+    const response = await this.request<Application[]>(`/applications/device/${deviceId}/active`)
     if (response.error) {
       throw new Error(response.error)
     }
