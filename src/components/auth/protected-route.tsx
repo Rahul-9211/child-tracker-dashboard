@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { auth } from '@/lib/auth-utils'
 
 interface ProtectedRouteProps {
@@ -11,6 +11,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, allowedRoles = [] }: ProtectedRouteProps) {
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     // First check if user is authenticated
@@ -21,15 +22,19 @@ export function ProtectedRoute({ children, allowedRoles = [] }: ProtectedRoutePr
 
     // Then check if user has required role (if roles are specified)
     if (allowedRoles.length > 0 && !auth.isAuthorized(allowedRoles)) {
-      // Redirect to appropriate dashboard based on user's role
+      // Only redirect if we're not already on the appropriate dashboard
       const user = auth.getUser()
-      if (user?.role === 'admin') {
+      
+      if (user?.role === 'admin' && pathname !== '/admin/dashboard') {
         router.push('/admin/dashboard')
-      } else {
+      } else if (user?.role !== 'admin' && pathname === '/dashboard') {
+        // Don't redirect from other pages (like /sms, /calls, etc.) to dashboard
+        return
+      } else if (user?.role !== 'admin' && pathname !== '/dashboard' && pathname === '/') {
         router.push('/dashboard')
       }
     }
-  }, [router, allowedRoles])
+  }, [router, allowedRoles, pathname])
 
   return <>{children}</>
 } 

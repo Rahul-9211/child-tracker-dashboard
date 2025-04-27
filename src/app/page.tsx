@@ -1,24 +1,26 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { auth } from "@/lib/auth-utils";
 
 export default function Home() {
-  const router = useRouter();
-
   useEffect(() => {
-    if (auth.isAuthenticated()) {
-      const user = auth.getUser();
-      if (user?.role === 'admin') {
-        router.push('/admin/dashboard');
+    // Use direct location.replace to avoid Next.js router history 
+    // which seems to be causing issues with the dashboard
+    if (typeof window !== 'undefined') {
+      if (auth.isAuthenticated()) {
+        const user = auth.getUser();
+        if (user?.role === 'admin') {
+          window.location.replace('/admin/dashboard');
+        } else {
+          window.location.replace('/dashboard');
+        }
       } else {
-        router.push('/dashboard');
+        window.location.replace('/login');
       }
-    } else {
-      router.push('/login');
     }
-  }, [router]);
+  }, []);
 
+  // Show nothing while redirecting
   return null;
 }

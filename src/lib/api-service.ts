@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://child-tracker-server.onrender.com';
+const API_BASE_URL = `${process.env.NEXT_PUBLIC_API_URL}/api`;
 
 interface User {
   _id: string;
@@ -187,7 +187,7 @@ class ApiService {
 
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/signin`, {
+      const response = await fetch(`${API_BASE_URL}/auth/signin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
