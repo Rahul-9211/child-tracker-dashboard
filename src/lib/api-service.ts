@@ -157,18 +157,21 @@ interface CallResponse {
 }
 
 class ApiService {
-  private async request<T>(endpoint: string): Promise<{ data: T; error?: string }> {
+  private async request<T>(endpoint: string, options: { method?: string; body?: string } = {}): Promise<{ data: T; error?: string }> {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
 
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        method: options.method || 'GET',
+        headers,
+        body: options.body,
       });
 
       if (!response.ok) {
@@ -181,7 +184,7 @@ class ApiService {
       const data = await response.json();
       return { data };
     } catch (error) {
-      return { data: [] as T, error: error instanceof Error ? error.message : 'An error occurred' };
+      return { data: null as T, error: error instanceof Error ? error.message : 'An error occurred' };
     }
   }
 
@@ -260,6 +263,32 @@ class ApiService {
       throw new Error(response.error)
     }
     return response.data
+  }
+
+  // Auth
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const response = await this.request<{ message: string }>(`/auth/forgot-password`, {
+      method: 'POST',
+      body: JSON.stringify({ 
+        email,
+        resetPasswordUrl: `${API_BASE_URL}/reset-password`
+      }),
+    });
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    return response.data;
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const response = await this.request<{ message: string }>(`/auth/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    return response.data;
   }
 
   // Add other API methods here
