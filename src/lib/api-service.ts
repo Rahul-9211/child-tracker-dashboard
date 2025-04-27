@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://child-tracker-server.onrender.com/api';
+const API_BASE_URL = 'https://child-tracker-server.onrender.com';
 
 interface User {
   _id: string;
