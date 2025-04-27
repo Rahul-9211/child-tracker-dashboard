@@ -1,6 +1,4 @@
-"use client"
 
-import { useState, useLayoutEffect } from "react"
 import { AppSidebar } from "@/components/ui/app-sidebar"
 import {
   Breadcrumb,

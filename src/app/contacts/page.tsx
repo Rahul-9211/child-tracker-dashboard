@@ -76,7 +76,7 @@ export default function Contacts() {
           return;
         }
 
-        const response = await fetch('https://child-tracker-server.onrender.com/api/devices', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/devices`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -122,7 +122,7 @@ export default function Contacts() {
         }
 
         setLoading(true);
-        const response = await fetch(`https://child-tracker-server.onrender.com/api/contacts/device/${selectedDevice}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contacts/device/${selectedDevice}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
