@@ -89,6 +89,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   useEffect(() => {
     setMounted(true);
+    
+    // Don't automatically redirect here, let the protected route handle it
+    if (typeof window !== 'undefined' && !auth.isAuthenticated()) {
+      // Don't force redirect here as it causes navigation issues
+      // window.location.replace('/login');
+      // return;
+    }
+    
     const user = auth.getUser();
     if (user) {
       setUserData({
