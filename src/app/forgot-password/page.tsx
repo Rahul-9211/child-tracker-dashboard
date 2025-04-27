@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiService } from "@/lib/api-service";
 import { toast } from "sonner";
 import { GalleryVerticalEnd, CheckCircle } from "lucide-react";
@@ -70,7 +69,7 @@ export default function ForgotPassword() {
                   </div>
                   <h1 className="text-2xl font-bold">Check Your Email</h1>
                   <p className="text-balance text-sm text-muted-foreground">
-                    We've sent a password reset link to <span className="font-medium">{email}</span>. 
+                    We{"'"}ve sent a password reset link to <span className="font-medium">{email}</span>. 
                     Please check your inbox and follow the instructions to reset your password.
                   </p>
                 </div>
