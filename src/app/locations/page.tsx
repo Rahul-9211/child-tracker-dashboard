@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { apiService } from "@/lib/api-service";
 
 interface Location {
   _id: string;
@@ -73,21 +74,7 @@ export default function Locations() {
           return;
         }
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/devices`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error('Failed to fetch devices');
-        }
-
-        const data = await response.json();
+        const data = await apiService.getDevices();
         setDevices(data);
         
         const storedDeviceId = localStorage.getItem('deviceId');
@@ -126,12 +113,14 @@ export default function Locations() {
         if (!response.ok) {
           if (response.status === 401) {
             auth.logout();
+            setLocations([]);
             return;
           }
           throw new Error('Failed to fetch locations');
         }
         
         const data = await response.json();
+        console.log(data);
         setLocations(Array.isArray(data) ? data : [data]);
         setError(null);
       } catch (err) {

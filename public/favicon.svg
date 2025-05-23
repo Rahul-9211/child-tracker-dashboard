@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background circle -->
+    <circle cx="16" cy="16" r="16" fill="#1A1A1A"/>
+    
+    <!-- Location pin -->
+    <path d="M16 4C12.13 4 9 7.13 9 11C9 15.5 16 24 16 24C16 24 23 15.5 23 11C23 7.13 19.87 4 16 4ZM16 13C14.34 13 13 11.66 13 10C13 8.34 14.34 7 16 7C17.66 7 19 8.34 19 10C19 11.66 17.66 13 16 13Z" fill="white"/>
+    
+    <!-- Child silhouette -->
+    <path d="M16 16C18.21 16 20 14.21 20 12C20 9.79 18.21 8 16 8C13.79 8 12 9.79 12 12C12 14.21 13.79 16 16 16ZM16 18C13.33 18 8 19.34 8 22V24H24V22C24 19.34 18.67 18 16 18Z" fill="white"/>
+</svg> 

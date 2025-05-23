@@ -53,7 +53,12 @@ export default function DeviceInfo() {
           return;
         }
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/devices`, {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const endpoint = user.role === 'user' 
+          ? `/devices/${user.allowedDevices[0]}`
+          : '/devices';
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api${endpoint}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -68,14 +73,16 @@ export default function DeviceInfo() {
         }
 
         const data = await response.json();
-        setDevices(data);
+        // For user role, wrap single device in array to maintain consistent data structure
+        const devicesData = user.role === 'user' ? [data] : data;
+        setDevices(devicesData);
         
         const storedDeviceId = localStorage.getItem('deviceId');
         if (storedDeviceId) {
           setSelectedDevice(storedDeviceId);
-        } else if (data.length > 0) {
-          setSelectedDevice(data[0].deviceId);
-          localStorage.setItem('deviceId', data[0].deviceId);
+        } else if (devicesData.length > 0) {
+          setSelectedDevice(devicesData[0].deviceId);
+          localStorage.setItem('deviceId', devicesData[0].deviceId);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -97,7 +104,12 @@ export default function DeviceInfo() {
         }
 
         setLoading(true);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/devices/${selectedDevice}`, {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const endpoint = user.role === 'user' 
+          ? `/devices/${selectedDevice}`
+          : `/devices/${selectedDevice}`;
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api${endpoint}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

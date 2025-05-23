@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Image from "next/image";
+import { apiService } from "@/lib/api-service";
 
 interface Contact {
   _id: string;
@@ -75,23 +76,10 @@ export default function Contacts() {
           auth.logout();
           return;
         }
-
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/devices`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            auth.logout();
-            return;
-          }
-          throw new Error('Failed to fetch devices');
-        }
-
-        const data = await response.json();
+        const data = await apiService.getDevices();
         setDevices(data);
+
+       
         
         // If there's a device in localStorage, use it
         const storedDeviceId = localStorage.getItem('deviceId');

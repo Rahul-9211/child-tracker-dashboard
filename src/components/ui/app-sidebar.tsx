@@ -10,7 +10,7 @@ import {
   Map,
   Users,
   Activity,
-  Settings2,
+  // Settings2,
   Home,
 } from "lucide-react"
 
@@ -72,11 +72,11 @@ const navMain = [
     url: "/calls",
     icon: Phone,
   },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings2,
-  },
+  // {
+  //   title: "Settings",
+  //   url: "/settings",
+  //   icon: Settings2,
+  // },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
