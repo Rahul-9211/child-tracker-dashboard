@@ -15,6 +15,14 @@ interface LoginCredentials {
   password: string;
 }
 
+interface SignupCredentials {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  deviceId: string;
+}
+
 interface LoginResponse {
   user: User;
   token: string;
@@ -211,6 +219,29 @@ class ApiService {
     }
   }
 
+  async signup(credentials: SignupCredentials): Promise<LoginResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Signup failed');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Signup error:', error);
+      throw error;
+    }
+  }
+
   // Process Activities
   async getProcessActivities(deviceId: string): Promise<ProcessActivity[]> {
     const response = await this.request<ProcessActivity[]>(`/process-activities/device/${deviceId}/active`)
@@ -222,11 +253,28 @@ class ApiService {
 
   // Devices
   async getDevices(): Promise<Device[]> {
-    const response = await this.request<Device[]>(`/devices`)
-    if (response.error) {
-      throw new Error(response.error)
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (user.role === 'user' && user.allowedDevices?.length > 0) {
+      // For user role, fetch only the allowed device
+      const deviceId = user.allowedDevices[0];
+      const device = await this.getDeviceById(deviceId);
+      return [device];
     }
-    return response.data
+    
+    // For admin role, fetch all devices
+    const response = await this.request<Device[]>(`/devices`);
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    return response.data;
+  }
+
+  async getDeviceById(deviceId: string): Promise<Device> {
+    const response = await this.request<Device>(`/devices/${deviceId}`);
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    return response.data;
   }
 
   // Applications
